@@ -1,3 +1,5 @@
+import 'package:biyuya/theme/theme.dart';
+import 'package:biyuya/theme/theme_builder.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -7,14 +9,17 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    final brightness = View.of(context).platformDispatcher.platformBrightness;
+
+    final textTheme = createTextTheme(context, 'Inter', 'Roboto');
+
+    final theme = MaterialTheme(textTheme);
+
     return MaterialApp(
       title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
+      theme: brightness == Brightness.light ? theme.light() : theme.dark(),
       home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
