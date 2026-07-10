@@ -1,6 +1,6 @@
 import 'package:biyuya/src/core/data/models/user_profile_model.dart';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
-import 'package:biyuya/src/features/auth/data/repositories/auth_repository_base.dart';
+import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household.dart';
 import 'package:biyuya/src/features/auth/domain/models/household_model.dart';
 import 'package:multiple_result/multiple_result.dart';
