@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/core.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:biyuya/theme/theme_builder.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<void> main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  EnvironmentConfig.validate();
 
   await Supabase.initialize(
     url: const String.fromEnvironment('SUPABASE_URL'),
