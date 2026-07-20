@@ -19,8 +19,6 @@ Future<void> main() async {
       child: MyApp(),
     ),
   );
-
-  FlutterNativeSplash.remove();
 }
 
 class MyApp extends StatelessWidget {
