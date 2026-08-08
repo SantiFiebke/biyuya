@@ -25,6 +25,7 @@ analyzer:
     unnecessary_cast: warning
     one_member_abstracts: ignore
     public_member_api_docs: ignore
+    lines_longer_than_80_chars: ignore
   plugins:
     - riverpod_lint
 

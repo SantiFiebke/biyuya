@@ -1,10 +1,17 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household.dart';
+import 'package:equatable/equatable.dart';
 import 'package:multiple_result/multiple_result.dart';
 
-class AuthFailure {
+class AuthFailure extends Equatable {
   const AuthFailure(this.message);
   final String message;
+
+  @override
+  List<Object?> get props => [message];
+
+  @override
+  String toString() => message;
 }
 
 abstract class AuthRepositoryBase {

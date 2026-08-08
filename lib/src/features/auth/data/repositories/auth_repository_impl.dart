@@ -1,8 +1,8 @@
 import 'package:biyuya/src/core/data/models/user_profile_model.dart';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
-import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household.dart';
 import 'package:biyuya/src/features/auth/domain/models/household_model.dart';
+import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
 import 'package:multiple_result/multiple_result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
@@ -13,15 +13,12 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
 
   @override
   Stream<UserProfile?> get onAuthStateChanged {
-    // List supabase auth state changes and map them to UserProfile
     return _client.auth.onAuthStateChange.asyncMap((data) async {
       final user = data.session?.user;
       if (user == null) {
         return null;
       }
 
-      // If user is not null, fetch the corresponding UserProfile from
-      // the database
       final result = await getUserProfile(user.id);
       return result.when(
         (profile) => profile,
@@ -38,10 +35,14 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     required String lastName,
   }) async {
     try {
-      // 1. Technical registration with Supabase Auth
+      // 1. Registro técnico pasando metadata de usuario a Supabase Auth
       final response = await _client.auth.signUp(
         email: email,
         password: password,
+        data: {
+          'first_name': name,
+          'last_name': lastName,
+        },
       );
 
       final user = response.user;
@@ -49,15 +50,11 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
         return const Error(AuthFailure('No se pudo crear el usuario.'));
       }
 
-      // 2. Immediate creation of their profile mirror
-      //  (with household_id initially null)
       final profileModel = UserProfileModel(
         id: user.id,
         name: name,
         lastName: lastName,
       );
-
-      await _client.from('profiles').insert(profileModel.toJson());
 
       return Success(profileModel);
     } on supabase.AuthException catch (e) {
@@ -83,7 +80,6 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
         return const Error(AuthFailure('Usuario no encontrado.'));
       }
 
-      // Buscamos su perfil de base de datos
       return await getUserProfile(user.id);
     } on supabase.AuthException catch (e) {
       return Error(AuthFailure(e.message));
@@ -114,7 +110,6 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     required String userId,
   }) async {
     try {
-      // 1. Create a new household in the database
       final householdData = await _client
           .from('households')
           .insert({'name': householdName})
@@ -123,7 +118,6 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
 
       final household = HouseholdModel.fromJson(householdData);
 
-      // 2. Immediately link the user to the newly created household
       final joinResult = await joinHousehold(
         householdId: household.id,
         userId: userId,
@@ -144,9 +138,6 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     required String userId,
   }) async {
     try {
-      // Update the user's profile to link them to the specified household.
-      // Triggering the RLS (Row Level Security) policies in Supabase to ensure
-      // that the user can only join households they are allowed to.
       final updatedData = await _client
           .from('profiles')
           .update({'household_id': householdId})
