@@ -20,7 +20,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
       }
 
       final result = await getUserProfile(user.id);
-      return result.when(
+      return await result.when(
         (profile) => profile,
         (error) => null,
       );
@@ -123,7 +123,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
         userId: userId,
       );
 
-      return joinResult.when(
+      return await joinResult.when(
         (success) => Success(household),
         Error.new,
       );
