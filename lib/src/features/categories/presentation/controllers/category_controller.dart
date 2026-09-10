@@ -100,7 +100,7 @@ class CategoryController extends _$CategoryController {
 
   Future<bool> deleteCategory({required int id}) async {
     final repository = ref.read(categoryRepositoryProvider);
-    final result = await repository.deleteCategory(id: id    );
+    final result = await repository.deleteCategory(id: id);
     // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
     return result.when(
       (_) {

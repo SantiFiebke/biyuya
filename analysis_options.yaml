@@ -26,6 +26,7 @@ analyzer:
     one_member_abstracts: ignore
     public_member_api_docs: ignore
     lines_longer_than_80_chars: ignore
+    flutter_style_todos: ignore
   exclude:
     - build/**
     - android/**

@@ -56,13 +56,13 @@ void main() {
     // Default: auto-load returns empty (individual tests can override)
     when(
       () => mockRepo.getCategories(householdId: 1),
-    ).thenAnswer((_) async => Success([]));
+    ).thenAnswer((_) async => const Success([]));
 
     container = ProviderContainer(
       overrides: [
         categoryRepositoryProvider.overrideWithValue(mockRepo),
         authSessionControllerProvider.overrideWith(
-          () => _FakeAuthSessionController(),
+          _FakeAuthSessionController.new,
         ),
       ],
     );

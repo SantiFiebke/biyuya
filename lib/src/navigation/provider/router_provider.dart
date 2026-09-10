@@ -1,6 +1,7 @@
 import 'package:biyuya/src/core/presentation/pages/splash_page.dart';
 import 'package:biyuya/src/features/auth/presentation/presentation.dart';
 import 'package:biyuya/src/features/categories/categories.dart';
+import 'package:biyuya/src/features/expenses/expenses.dart';
 import 'package:biyuya/src/features/home/home.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:go_router/go_router.dart';
@@ -48,6 +49,33 @@ GoRouter router(Ref ref) {
         builder: (context, state) {
           final category = state.extra as Category?;
           return CategoryFormView(category: category);
+        },
+      ),
+      GoRoute(
+        path: '/expenses',
+        builder: (context, state) => const ExpenseListView(),
+      ),
+      GoRoute(
+        path: '/expenses/new',
+        builder: (context, state) => const ExpenseFormView(),
+      ),
+      GoRoute(
+        path: '/expenses/:id/edit',
+        builder: (context, state) {
+          final expense = state.extra as Expense?;
+          return ExpenseFormView(expense: expense);
+        },
+      ),
+      GoRoute(
+        path: '/expenses/:id',
+        builder: (context, state) {
+          final expense = state.extra as Expense?;
+          if (expense == null) {
+            return const Scaffold(
+              body: Center(child: Text('Gasto no encontrado')),
+            );
+          }
+          return ExpenseDetailView(expense: expense);
         },
       ),
     ],
