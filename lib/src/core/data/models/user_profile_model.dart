@@ -13,7 +13,9 @@ class UserProfileModel extends UserProfile {
       id: json['id'] as String,
       name: json['name'] as String,
       lastName: json['last_name'] as String,
-      householdId: json['household_id'] as String?,
+      householdId: json['household_id'] != null
+          ? (json['household_id'] as num).toString()
+          : null,
     );
   }
 

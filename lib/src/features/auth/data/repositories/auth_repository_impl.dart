@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:biyuya/src/core/data/models/user_profile_model.dart';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household.dart';
@@ -20,11 +22,20 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
       }
 
       final result = await getUserProfile(user.id);
-      return await result.when(
-        (profile) => profile,
-        (error) => null,
-      );
+      return await result.when((profile) => profile, (error) => null);
     });
+  }
+
+  @override
+  Stream<UserProfile?> onProfileChanged({required String userId}) {
+    return _client
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .asyncMap(
+          (_) =>
+              getUserProfile(userId).then((r) => r.when((p) => p, (_) => null)),
+        );
   }
 
   @override
@@ -39,10 +50,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
       final response = await _client.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'first_name': name,
-          'last_name': lastName,
-        },
+        data: {'first_name': name, 'last_name': lastName},
       );
 
       final user = response.user;
@@ -123,10 +131,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
         userId: userId,
       );
 
-      return await joinResult.when(
-        (success) => Success(household),
-        Error.new,
-      );
+      return await joinResult.when((success) => Success(household), Error.new);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al crear el hogar: $e'));
     }

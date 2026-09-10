@@ -1,5 +1,7 @@
 import 'package:biyuya/src/core/presentation/pages/splash_page.dart';
 import 'package:biyuya/src/features/auth/presentation/presentation.dart';
+import 'package:biyuya/src/features/categories/categories.dart';
+import 'package:biyuya/src/features/home/home.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -10,10 +12,7 @@ part 'router_provider.g.dart';
 /// Notifier que retransmite los cambios del AuthSessionController a GoRouter
 class RouterRefreshNotifier extends ChangeNotifier {
   RouterRefreshNotifier(Ref ref) {
-    ref.listen(
-      authSessionControllerProvider,
-      (_, _) => notifyListeners(),
-    );
+    ref.listen(authSessionControllerProvider, (_, _) => notifyListeners());
   }
 }
 
@@ -25,25 +24,31 @@ GoRouter router(Ref ref) {
     initialLocation: '/splash',
     refreshListenable: refreshNotifier,
     routes: [
-      GoRoute(
-        path: '/splash',
-        builder: (context, state) => const SplashPage(),
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginView(),
-      ),
+      GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginView()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterView(),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const SizedBox(), // TODO(SDX): OnboardingView.
+        builder: (context, state) => const OnboardingView(),
+      ),
+      GoRoute(path: '/home', builder: (context, state) => const HomeView()),
+      GoRoute(
+        path: '/categories',
+        builder: (context, state) => const CategoryListView(),
       ),
       GoRoute(
-        path: '/home',
-        builder: (context, state) => const SizedBox(), // TODO(SDX): HomeView.
+        path: '/categories/new',
+        builder: (context, state) => const CategoryFormView(),
+      ),
+      GoRoute(
+        path: '/categories/:id/edit',
+        builder: (context, state) {
+          final category = state.extra as Category?;
+          return CategoryFormView(category: category);
+        },
       ),
     ],
     redirect: (context, state) {

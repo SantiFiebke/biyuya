@@ -42,16 +42,13 @@ class _LoginViewState extends ConsumerState<LoginView> {
     final authFormState = ref.watch(authFormControllerProvider);
     final isLoading = authFormState.isLoading;
 
-    ref.listen<AsyncValue<void>>(
-      authFormControllerProvider,
-      (_, state) {
-        state.whenOrNull(
-          error: (error, _) {
-            context.showErrorSnackBar(error.toString());
-          },
-        );
-      },
-    );
+    ref.listen<AsyncValue<void>>(authFormControllerProvider, (_, state) {
+      state.whenOrNull(
+        error: (error, _) {
+          context.showErrorSnackBar(error.toString());
+        },
+      );
+    });
 
     return Scaffold(
       body: SafeArea(

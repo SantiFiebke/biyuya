@@ -17,6 +17,9 @@ class AuthFailure extends Equatable {
 abstract class AuthRepositoryBase {
   Stream<UserProfile?> get onAuthStateChanged;
 
+  /// Escucha cambios en el perfil del usuario (ej: household_id modificado)
+  Stream<UserProfile?> onProfileChanged({required String userId});
+
   /// Registro técnico con Email y Password
   Future<Result<UserProfile, AuthFailure>> signUpWithEmailPassword({
     required String email,

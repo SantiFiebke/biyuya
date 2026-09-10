@@ -1,0 +1,87 @@
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/domain/models/category_model.dart';
+import 'package:biyuya/src/features/categories/domain/repositories/category_repository_base.dart';
+import 'package:multiple_result/multiple_result.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+
+class CategoryRepositoryImpl implements CategoryRepositoryBase {
+  const CategoryRepositoryImpl(this._client);
+
+  final supabase.SupabaseClient _client;
+
+  @override
+  Future<Result<List<Category>, CategoryFailure>> getCategories({
+    required int householdId,
+  }) async {
+    try {
+      final data = await _client
+          .from('categories')
+          .select()
+          .eq('household_id', householdId)
+          .order('name');
+
+      final categories = data.map(CategoryModel.fromJson).toList();
+      return Success(categories);
+    } on Exception catch (e) {
+      return Error(CategoryFailure('Error al obtener categorías: $e'));
+    }
+  }
+
+  @override
+  Future<Result<Category, CategoryFailure>> createCategory({
+    required String name,
+    required int householdId,
+    String? color,
+    String? icon,
+  }) async {
+    try {
+      final data = await _client
+          .from('categories')
+          .insert({
+            'name': name,
+            'color': color,
+            'icon': icon,
+            'household_id': householdId,
+          })
+          .select()
+          .single();
+
+      return Success(CategoryModel.fromJson(data));
+    } on Exception catch (e) {
+      return Error(CategoryFailure('Error al crear categoría: $e'));
+    }
+  }
+
+  @override
+  Future<Result<Category, CategoryFailure>> updateCategory({
+    required int id,
+    required String name,
+    String? color,
+    String? icon,
+  }) async {
+    try {
+      final data = await _client
+          .from('categories')
+          .update({'name': name, 'color': color, 'icon': icon})
+          .eq('id', id)
+          .select()
+          .single();
+
+      return Success(CategoryModel.fromJson(data));
+    } on Exception catch (e) {
+      return Error(CategoryFailure('Error al actualizar categoría: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void, CategoryFailure>> deleteCategory({
+    required int id,
+  }) async {
+    try {
+      await _client.from('categories').delete().eq('id', id);
+      return const Success(null);
+    } on Exception catch (e) {
+      return Error(CategoryFailure('Error al eliminar categoría: $e'));
+    }
+  }
+}

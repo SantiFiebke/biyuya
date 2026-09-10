@@ -18,9 +18,7 @@ extension BuildContextUIExtensions on BuildContext {
               ),
               InkWell(
                 onTap: () async {
-                  await Clipboard.setData(
-                    ClipboardData(text: message),
-                  );
+                  await Clipboard.setData(ClipboardData(text: message));
                 },
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8),

@@ -51,15 +51,12 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
     final authFormState = ref.watch(authFormControllerProvider);
     final isLoading = authFormState.isLoading;
 
-    ref.listen<AsyncValue<void>>(
-      authFormControllerProvider,
-      (previous, next) {
-        if (next.hasError && !next.isLoading) {
-          final error = next.error;
-          context.showErrorSnackBar(error.toString());
-        }
-      },
-    );
+    ref.listen<AsyncValue<void>>(authFormControllerProvider, (previous, next) {
+      if (next.hasError && !next.isLoading) {
+        final error = next.error;
+        context.showErrorSnackBar(error.toString());
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(

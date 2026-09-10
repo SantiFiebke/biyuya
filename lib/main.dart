@@ -2,10 +2,11 @@ import 'package:biyuya/src/core/core.dart';
 import 'package:biyuya/src/navigation/provider/router_provider.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:biyuya/theme/theme_builder.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations;
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart' hide GlobalMaterialLocalizations;
+import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -40,7 +41,7 @@ class MyApp extends ConsumerWidget {
       routerConfig: ref.watch(routerProvider),
       localizationsDelegates: const [
         ...GlobalCupertinoLocalizations.delegates,
-        GlobalMaterialLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
         GlobalWidgetsLocalizations.delegate,
       ],
       supportedLocales: const [Locale('es', 'ES')],
