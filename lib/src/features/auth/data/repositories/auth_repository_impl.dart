@@ -126,12 +126,13 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
 
       final household = HouseholdModel.fromJson(householdData);
 
-      final joinResult = await joinHousehold(
-        householdId: household.id,
-        userId: userId,
-      );
+      // Link user to household directly by ID (just created)
+      await _client
+          .from('profiles')
+          .update({'household_id': household.id})
+          .eq('id', userId);
 
-      return await joinResult.when((success) => Success(household), Error.new);
+      return Success(household);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al crear el hogar: $e'));
     }
@@ -139,10 +140,22 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
 
   @override
   Future<Result<UserProfile, AuthFailure>> joinHousehold({
-    required String householdId,
+    required String inviteCode,
     required String userId,
   }) async {
     try {
+      final householdData = await _client
+          .from('households')
+          .select('id')
+          .eq('invite_code', inviteCode.toUpperCase())
+          .maybeSingle();
+
+      if (householdData == null) {
+        return const Error(AuthFailure('Código de invitación no válido.'));
+      }
+
+      final householdId = (householdData['id'] as num).toString();
+
       final updatedData = await _client
           .from('profiles')
           .update({'household_id': householdId})
@@ -152,11 +165,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
 
       return Success(UserProfileModel.fromJson(updatedData));
     } on Exception catch (e) {
-      return Error(
-        AuthFailure(
-          'Error al unirse al hogar. Verifica el código ingresado: $e',
-        ),
-      );
+      return Error(AuthFailure('Error al unirse al hogar: $e'));
     }
   }
 

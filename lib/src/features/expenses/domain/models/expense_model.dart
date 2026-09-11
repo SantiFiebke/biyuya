@@ -10,9 +10,12 @@ class ExpenseModel extends Expense {
     required super.createdAt,
     super.description,
     super.userUuid,
+    super.userName,
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
+    final profiles = json['profiles'] as Map<String, dynamic>?;
+
     return ExpenseModel(
       id: (json['id'] as num).toInt(),
       amount: (json['amount'] as num).toDouble(),
@@ -21,6 +24,7 @@ class ExpenseModel extends Expense {
       householdId: (json['household_id'] as num).toInt(),
       categoryId: (json['category_id'] as num).toInt(),
       userUuid: json['user_uuid'] as String?,
+      userName: profiles?['name'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }

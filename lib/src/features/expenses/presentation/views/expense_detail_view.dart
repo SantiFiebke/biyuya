@@ -76,7 +76,7 @@ class ExpenseDetailView extends ConsumerWidget {
 
             _DetailRow(
               label: 'Registrado por',
-              value: expense.userUuid ?? 'N/A',
+              value: expense.userName ?? 'Desconocido',
             ),
           ],
         ),

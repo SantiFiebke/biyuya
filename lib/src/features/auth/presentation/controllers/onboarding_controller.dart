@@ -1,4 +1,5 @@
 import 'package:biyuya/src/core/network/supabase_client_provider.dart';
+import 'package:biyuya/src/features/auth/domain/entities/household.dart';
 import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
 import 'package:biyuya/src/features/auth/provider/auth_repository_provider.dart';
 import 'package:multiple_result/multiple_result.dart';
@@ -8,6 +9,10 @@ part 'onboarding_controller.g.dart';
 
 @riverpod
 class OnboardingController extends _$OnboardingController {
+  Household? _createdHousehold;
+
+  Household? get createdHousehold => _createdHousehold;
+
   @override
   AsyncValue<void> build() {
     return const AsyncData(null);
@@ -34,10 +39,18 @@ class OnboardingController extends _$OnboardingController {
       userId: userId,
     );
 
-    _handleResult(result);
+    result.when(
+      (household) {
+        _createdHousehold = household;
+        state = const AsyncData(null);
+      },
+      (failure) {
+        state = AsyncError(failure as Object, StackTrace.current);
+      },
+    );
   }
 
-  Future<void> joinExistingHousehold(String householdId) async {
+  Future<void> joinExistingHousehold(String inviteCode) async {
     state = const AsyncLoading();
 
     final supabaseClient = ref.read(supabaseClientProvider);
@@ -54,7 +67,7 @@ class OnboardingController extends _$OnboardingController {
     final repository = ref.read(authRepositoryProvider);
 
     final result = await repository.joinHousehold(
-      householdId: householdId,
+      inviteCode: inviteCode,
       userId: userId,
     );
 
@@ -65,10 +78,6 @@ class OnboardingController extends _$OnboardingController {
     result.when(
       (success) {
         state = const AsyncData(null);
-        // Nota: Al mutar con éxito el household_id en Postgres, el backend
-        // actualizará el perfil, gatillando el stream de onAuthStateChanged,
-        // lo que provocará que AuthSessionController  emita el nuevo
-        // UserProfile actualizado.
       },
       (failure) {
         state = AsyncError(failure as Object, StackTrace.current);

@@ -10,6 +10,7 @@ class Expense extends Equatable {
     required this.createdAt,
     this.description,
     this.userUuid,
+    this.userName,
   });
 
   final int id;
@@ -19,6 +20,7 @@ class Expense extends Equatable {
   final int householdId;
   final int categoryId;
   final String? userUuid;
+  final String? userName;
   final DateTime createdAt;
 
   @override
@@ -30,6 +32,7 @@ class Expense extends Equatable {
     householdId,
     categoryId,
     userUuid,
+    userName,
     createdAt,
   ];
 }

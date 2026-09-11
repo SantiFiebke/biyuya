@@ -3,6 +3,7 @@ import 'package:biyuya/src/features/auth/presentation/presentation.dart';
 import 'package:biyuya/src/features/categories/categories.dart';
 import 'package:biyuya/src/features/expenses/expenses.dart';
 import 'package:biyuya/src/features/home/home.dart';
+import 'package:biyuya/src/features/profile/profile.dart';
 import 'package:biyuya/src/features/reports/reports.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:go_router/go_router.dart';
@@ -82,6 +83,10 @@ GoRouter router(Ref ref) {
       GoRoute(
         path: '/reports',
         builder: (context, state) => const ReportView(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileView(),
       ),
     ],
     redirect: (context, state) {

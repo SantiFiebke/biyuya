@@ -46,9 +46,9 @@ abstract class AuthRepositoryBase {
     required String userId,
   });
 
-  /// Fase Onboarding: Vincula a un usuario a un hogar existente mediante su ID/Código
+  /// Fase Onboarding: Vincula a un usuario a un hogar existente mediante código de invitación
   Future<Result<UserProfile, AuthFailure>> joinHousehold({
-    required String householdId,
+    required String inviteCode,
     required String userId,
   });
 }

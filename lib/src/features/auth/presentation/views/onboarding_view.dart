@@ -1,5 +1,6 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/onboarding_controller.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -13,23 +14,34 @@ class OnboardingView extends ConsumerStatefulWidget {
 
 class _OnboardingViewState extends ConsumerState<OnboardingView> {
   int _selectedIndex = 0; // 0 = crear, 1 = unirme
+  bool _showingInviteCode = false;
 
   Future<void> _createHousehold(String name) async {
     await ref
         .read(onboardingControllerProvider.notifier)
         .createNewHousehold(name);
+
+    final household = ref
+        .read(onboardingControllerProvider.notifier)
+        .createdHousehold;
+    if (household?.inviteCode != null && mounted) {
+      setState(() => _showingInviteCode = true);
+    }
   }
 
-  Future<void> _joinHousehold(String householdId) async {
+  Future<void> _joinHousehold(String inviteCode) async {
     await ref
         .read(onboardingControllerProvider.notifier)
-        .joinExistingHousehold(householdId);
+        .joinExistingHousehold(inviteCode);
   }
 
   @override
   Widget build(BuildContext context) {
     final onboardingState = ref.watch(onboardingControllerProvider);
     final isLoading = onboardingState.isLoading;
+    final household = ref
+        .read(onboardingControllerProvider.notifier)
+        .createdHousehold;
 
     ref.listen<AsyncValue<void>>(onboardingControllerProvider, (_, state) {
       state.whenOrNull(
@@ -69,24 +81,135 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 48),
-              _OnboardingOptions(
-                selectedIndex: _selectedIndex,
-                isLoading: isLoading,
-                onSelected: (index) => setState(() => _selectedIndex = index),
-              ),
-              const SizedBox(height: 24),
-              if (_selectedIndex == 0)
-                _CreateHouseholdForm(
-                  onSubmit: _createHousehold,
-                  isLoading: isLoading,
+
+              if (_showingInviteCode && household?.inviteCode != null)
+                _InviteCodeDisplay(
+                  householdName: household!.name,
+                  inviteCode: household.inviteCode!,
+                  onContinue: () => context.go('/home'),
                 )
-              else
-                _JoinHouseholdForm(
-                  onSubmit: _joinHousehold,
+              else ...[
+                _OnboardingOptions(
+                  selectedIndex: _selectedIndex,
                   isLoading: isLoading,
+                  onSelected: (index) => setState(() => _selectedIndex = index),
                 ),
+                const SizedBox(height: 24),
+                if (_selectedIndex == 0)
+                  _CreateHouseholdForm(
+                    onSubmit: _createHousehold,
+                    isLoading: isLoading,
+                  )
+                else
+                  _JoinHouseholdForm(
+                    onSubmit: _joinHousehold,
+                    isLoading: isLoading,
+                  ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteCodeDisplay extends StatelessWidget {
+  const _InviteCodeDisplay({
+    required this.householdName,
+    required this.inviteCode,
+    required this.onContinue,
+  });
+
+  final String householdName;
+  final String inviteCode;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '¡Hogar creado!',
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              householdName,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Compartí este código con tu pareja:',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                inviteCode,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 8,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: inviteCode));
+                    if (context.mounted) {
+                      context.showSuccessSnackBar('Código copiado');
+                    }
+                  },
+                  icon: const Icon(Icons.copy),
+                  label: const Text('Copiar código'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    // ponytail: clipboard for now, share_plus when needed
+                    await Clipboard.setData(ClipboardData(text: inviteCode));
+                    if (context.mounted) {
+                      context.showSuccessSnackBar(
+                        'Código copiado para compartir',
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.share),
+                  label: const Text('Compartir'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onContinue,
+                child: const Text('Entendido'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -209,11 +332,11 @@ class _JoinHouseholdForm extends StatefulWidget {
 
 class _JoinHouseholdFormState extends State<_JoinHouseholdForm> {
   final _formKey = GlobalKey<FormState>();
-  final _idController = TextEditingController();
+  final _codeController = TextEditingController();
 
   @override
   void dispose() {
-    _idController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -222,7 +345,7 @@ class _JoinHouseholdFormState extends State<_JoinHouseholdForm> {
       return;
     }
 
-    widget.onSubmit(_idController.text.trim());
+    widget.onSubmit(_codeController.text.trim().toUpperCase());
   }
 
   @override
@@ -233,23 +356,21 @@ class _JoinHouseholdFormState extends State<_JoinHouseholdForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextFormField(
-            controller: _idController,
+            controller: _codeController,
             decoration: const InputDecoration(
-              labelText: 'ID del hogar (UUID)',
+              labelText: 'Código de invitación',
+              hintText: 'Ej: ABC123',
               prefixIcon: Icon(Icons.vpn_key_outlined),
             ),
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 6,
             enabled: !widget.isLoading,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Por favor, ingresa el ID del hogar';
+                return 'Por favor, ingresa el código';
               }
-              // ponytail: basic UUID check, regex covers standard format
-              final uuidRegex = RegExp(
-                r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-                caseSensitive: false,
-              );
-              if (!uuidRegex.hasMatch(value.trim())) {
-                return 'Ingresa un UUID válido';
+              if (value.trim().length != 6) {
+                return 'El código debe tener 6 caracteres';
               }
               return null;
             },

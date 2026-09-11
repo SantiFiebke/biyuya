@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/home/presentation/widgets/invite_code_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -29,9 +32,7 @@ class HomeView extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.person_outline),
             tooltip: 'Perfil',
-            onPressed: () {
-              // TODO: Profile/settings screen.
-            },
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),
@@ -123,7 +124,7 @@ class _HouseholdHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final householdNameAsync = ref.watch(householdNameProvider);
+    final householdDataAsync = ref.watch(householdNameProvider);
 
     return Container(
       width: double.infinity,
@@ -142,7 +143,7 @@ class _HouseholdHeader extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: householdNameAsync.when(
+                child: householdDataAsync.when(
                   loading: () => Text(
                     'Hogar',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -157,21 +158,44 @@ class _HouseholdHeader extends ConsumerWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  data: (name) => Text(
-                    name ?? 'Hogar',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  data: (data) => Row(
+                    children: [
+                      Text(
+                        data?.name ?? 'Hogar',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      householdDataAsync.when(
+                        loading: () => const SizedBox(),
+                        error: (_, _) => const SizedBox(),
+                        data: (data) {
+                          if (data?.inviteCode == null) {
+                            return const SizedBox();
+                          }
+                          return IconButton(
+                            icon: const Icon(Icons.person_add, size: 20),
+                            tooltip: 'Compartir código',
+                            onPressed: () {
+                              InviteCodeSheet.show(
+                                context,
+                                inviteCode: data!.inviteCode!,
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Editar nombre',
-                onPressed: () {
-                  // TODO: Edit household name
-                },
+                onPressed: () => _showEditHouseholdDialog(context, ref),
               ),
               IconButton(
                 icon: const Icon(Icons.bar_chart_outlined),
@@ -180,14 +204,50 @@ class _HouseholdHeader extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'ID: ${userProfile.householdId ?? "N/A"}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-          ),
         ],
+      ),
+    );
+  }
+
+  void _showEditHouseholdDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController(
+      text: ref.read(householdNameProvider).value?.name ?? '',
+    );
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Editar nombre del hogar'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Nombre',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final name = controller.text.trim();
+                if (name.isEmpty) {
+                  return;
+                }
+                await ref.read(householdNameProvider.notifier).updateName(name);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -214,7 +274,12 @@ class _RecentExpenseTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(dateFormat.format(expense.date)),
+      subtitle: Text(
+        [
+          if (expense.userName != null) expense.userName,
+          dateFormat.format(expense.date),
+        ].join(' · '),
+      ),
       trailing: Text(
         amountFormat.format(expense.amount),
         style: Theme.of(

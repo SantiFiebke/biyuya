@@ -1,0 +1,236 @@
+import 'package:biyuya/src/core/domain/entities/user_profile.dart';
+import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
+import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/auth/provider/auth_repository_provider.dart';
+import 'package:biyuya/src/features/auth/provider/household_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
+
+class ProfileView extends ConsumerWidget {
+  const ProfileView({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authSessionControllerProvider);
+    final householdName = ref.watch(householdNameProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Perfil')),
+      body: session.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(child: Text('Error: $error')),
+        data: (userProfile) {
+          if (userProfile == null) {
+            return const Center(child: Text('No hay sesión activa'));
+          }
+          return ProfileContent(
+            userProfile: userProfile,
+            householdName: householdName,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ProfileContent extends StatelessWidget {
+  const ProfileContent({
+    required this.userProfile,
+    required this.householdName,
+    super.key,
+  });
+
+  final UserProfile userProfile;
+  final AsyncValue<HouseholdData?> householdName;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _UserInfoCard(userProfile: userProfile),
+          const SizedBox(height: 16),
+          _HouseholdInfoCard(householdName: householdName),
+          const SizedBox(height: 16),
+          const _MenuItems(),
+          const SizedBox(height: 24),
+          const _LogoutButton(),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserInfoCard extends StatelessWidget {
+  const _UserInfoCard({required this.userProfile});
+
+  final UserProfile userProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              child: Text(
+                '${userProfile.name[0]}${userProfile.lastName[0]}',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${userProfile.name} ${userProfile.lastName}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HouseholdInfoCard extends StatelessWidget {
+  const _HouseholdInfoCard({required this.householdName});
+
+  final AsyncValue<HouseholdData?> householdName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hogar',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.home_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: householdName.when(
+                    loading: () => const Text('Cargando...'),
+                    error: (_, _) => const Text('Error al cargar'),
+                    data: (data) => Text(
+                      data?.name ?? 'Sin nombre',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuItems extends StatelessWidget {
+  const _MenuItems();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.category_outlined),
+            title: const Text('Categorías'),
+            subtitle: const Text('Gestionar categorías de gastos'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/categories'),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.bar_chart_outlined),
+            title: const Text('Reportes'),
+            subtitle: const Text('Ver reportes mensuales'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/reports'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LogoutButton extends ConsumerWidget {
+  const _LogoutButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return OutlinedButton.icon(
+      onPressed: () async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cerrar sesión'),
+            content: const Text('¿Estás segura de que querés cerrar sesión?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                child: const Text('Cerrar sesión'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed == true && context.mounted) {
+          final result = await ref.read(authRepositoryProvider).signOut();
+          result.when(
+            (_) {
+              if (context.mounted) {
+                context.go('/login');
+              }
+            },
+            (failure) {
+              context.showErrorSnackBar(failure.message);
+            },
+          );
+        }
+      },
+      icon: const Icon(Icons.logout),
+      label: const Text('Cerrar sesión'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.error,
+        side: BorderSide(color: Theme.of(context).colorScheme.error),
+      ),
+    );
+  }
+}

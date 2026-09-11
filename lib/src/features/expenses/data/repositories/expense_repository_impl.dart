@@ -16,7 +16,7 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
     try {
       final data = await _client
           .from('expenses')
-          .select()
+          .select('*, profiles(name)')
           .eq('household_id', householdId)
           .order('date');
 
@@ -39,7 +39,7 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
 
       final data = await _client
           .from('expenses')
-          .select()
+          .select('*, profiles(name)')
           .eq('household_id', householdId)
           .gte('date', startDate.toIso8601String())
           .lte('date', endDate.toIso8601String())
@@ -72,7 +72,7 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
             'category_id': categoryId,
             'user_uuid': userUuid,
           })
-          .select()
+          .select('*, profiles(name)')
           .single();
 
       return Success(ExpenseModel.fromJson(data));
@@ -100,7 +100,7 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
             'last_modified_at': DateTime.now().toIso8601String(),
           })
           .eq('id', id)
-          .select()
+          .select('*, profiles(name)')
           .single();
 
       return Success(ExpenseModel.fromJson(data));
