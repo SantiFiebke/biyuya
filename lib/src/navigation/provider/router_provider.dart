@@ -3,6 +3,7 @@ import 'package:biyuya/src/features/auth/presentation/presentation.dart';
 import 'package:biyuya/src/features/categories/categories.dart';
 import 'package:biyuya/src/features/expenses/expenses.dart';
 import 'package:biyuya/src/features/home/home.dart';
+import 'package:biyuya/src/features/reports/reports.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -77,6 +78,10 @@ GoRouter router(Ref ref) {
           }
           return ExpenseDetailView(expense: expense);
         },
+      ),
+      GoRoute(
+        path: '/reports',
+        builder: (context, state) => const ReportView(),
       ),
     ],
     redirect: (context, state) {

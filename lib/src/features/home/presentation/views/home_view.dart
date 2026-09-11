@@ -1,5 +1,6 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
@@ -115,13 +116,15 @@ class _HomeContent extends StatelessWidget {
   }
 }
 
-class _HouseholdHeader extends StatelessWidget {
+class _HouseholdHeader extends ConsumerWidget {
   const _HouseholdHeader({required this.userProfile});
 
   final UserProfile userProfile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final householdNameAsync = ref.watch(householdNameProvider);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -139,11 +142,27 @@ class _HouseholdHeader extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'Hogar',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
+                child: householdNameAsync.when(
+                  loading: () => Text(
+                    'Hogar',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  error: (_, _) => Text(
+                    'Hogar',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  data: (name) => Text(
+                    name ?? 'Hogar',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -153,6 +172,11 @@ class _HouseholdHeader extends StatelessWidget {
                 onPressed: () {
                   // TODO: Edit household name
                 },
+              ),
+              IconButton(
+                icon: const Icon(Icons.bar_chart_outlined),
+                tooltip: 'Reportes',
+                onPressed: () => context.push('/reports'),
               ),
             ],
           ),

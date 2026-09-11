@@ -43,7 +43,9 @@ Widget wrap(Widget child) {
       categoryControllerProvider.overrideWithValue(
         AsyncData<List<Category>>(_testCategories),
       ),
-      expenseControllerProvider.overrideWithValue(const AsyncData<List<Expense>>([])),
+      expenseControllerProvider.overrideWithValue(
+        const AsyncData<List<Expense>>([]),
+      ),
     ],
     child: MaterialApp(home: Scaffold(body: child)),
   );
@@ -123,56 +125,51 @@ void main() {
       expect(find.text('Descripción (opcional)'), findsOneWidget);
     });
 
-    testWidgets(
-      'dropdown contains "Crear nueva categoría" option',
-      (tester) async {
-        await tester.pumpWidget(wrap(const ExpenseFormView()));
-        await tester.pumpAndSettle();
+    testWidgets('dropdown contains "Crear nueva categoría" option', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpAndSettle();
 
-        // Open the dropdown
-        await tester.tap(find.byType(DropdownButtonFormField<int>));
-        await tester.pumpAndSettle();
+      // Open the dropdown
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Crear nueva categoría'), findsOneWidget);
-        expect(find.byIcon(Icons.add_circle_outline), findsOneWidget);
-      },
-    );
+      expect(find.text('Crear nueva categoría'), findsOneWidget);
+      expect(find.byIcon(Icons.add_circle_outline), findsOneWidget);
+    });
 
-    testWidgets(
-      'tapping "Crear nueva categoría" opens BottomSheet',
-      (tester) async {
-        await tester.pumpWidget(wrap(const ExpenseFormView()));
-        await tester.pumpAndSettle();
+    testWidgets('tapping "Crear nueva categoría" opens BottomSheet', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpAndSettle();
 
-        // Open dropdown then tap "Crear nueva categoría"
-        await tester.tap(find.byType(DropdownButtonFormField<int>));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Crear nueva categoría'));
-        await tester.pumpAndSettle();
+      // Open dropdown then tap "Crear nueva categoría"
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Crear nueva categoría'));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Nueva categoría'), findsOneWidget);
-      },
-    );
+      expect(find.text('Nueva categoría'), findsOneWidget);
+    });
 
-    testWidgets(
-      'BottomSheet has name input and color picker',
-      (tester) async {
-        await tester.pumpWidget(wrap(const ExpenseFormView()));
-        await tester.pumpAndSettle();
+    testWidgets('BottomSheet has name input and color picker', (tester) async {
+      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpAndSettle();
 
-        // Open dropdown then tap "Crear nueva categoría"
-        await tester.tap(find.byType(DropdownButtonFormField<int>));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Crear nueva categoría'));
-        await tester.pumpAndSettle();
+      // Open dropdown then tap "Crear nueva categoría"
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Crear nueva categoría'));
+      await tester.pumpAndSettle();
 
-        // BottomSheet content
-        expect(find.text('Nueva categoría'), findsOneWidget);
-        expect(find.text('Nombre'), findsOneWidget);
-        // Color picker: multiple colored circles via GestureDetector
-        expect(find.byType(GestureDetector), findsWidgets);
-        expect(find.text('Crear'), findsOneWidget);
-      },
-    );
+      // BottomSheet content
+      expect(find.text('Nueva categoría'), findsOneWidget);
+      expect(find.text('Nombre'), findsOneWidget);
+      // Color picker: multiple colored circles via GestureDetector
+      expect(find.byType(GestureDetector), findsWidgets);
+      expect(find.text('Crear'), findsOneWidget);
+    });
   });
 }

@@ -4,6 +4,7 @@ import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
+import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'expense_controller.g.dart';
@@ -93,6 +94,7 @@ class ExpenseController extends _$ExpenseController {
     return result.when(
       (expense) {
         state = AsyncData([expense, ...state.value ?? []]);
+        ref.invalidate(reportControllerProvider);
         return true;
       },
       (failure) {
@@ -126,6 +128,7 @@ class ExpenseController extends _$ExpenseController {
         if (index != -1) {
           expenses[index] = updated;
           state = AsyncData(List.from(expenses));
+          ref.invalidate(reportControllerProvider);
         }
         return true;
       },
@@ -145,6 +148,7 @@ class ExpenseController extends _$ExpenseController {
       (_) {
         final expenses = state.value ?? [];
         state = AsyncData(expenses.where((e) => e.id != id).toList());
+        ref.invalidate(reportControllerProvider);
         return true;
       },
       (failure) {
