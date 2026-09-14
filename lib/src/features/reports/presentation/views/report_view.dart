@@ -1,4 +1,5 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
@@ -224,9 +225,9 @@ class CategoryBreakdownTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color =
-        _parseColor(breakdown.categoryColor) ??
+        parseCategoryColor(breakdown.categoryColor) ??
         Theme.of(context).colorScheme.primary;
-    final icon = _iconFromCodePoint(breakdown.categoryIcon);
+    final icon = iconFromCodePoint(breakdown.categoryIcon);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -250,30 +251,6 @@ class CategoryBreakdownTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Color? _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) {
-      return null;
-    }
-    final clean = hex.replaceFirst('#', '');
-    if (clean.length != 6) {
-      return null;
-    }
-    return Color(int.parse('FF$clean', radix: 16));
-  }
-
-  IconData _iconFromCodePoint(String? codePoint) {
-    if (codePoint == null) {
-      return Icons.category;
-    }
-    final cp = int.tryParse(codePoint);
-    if (cp == null) {
-      return Icons.category;
-    }
-    // Runtime icon codepoint from DB can't be const
-    // ignore: non_const_argument_for_const_parameter
-    return IconData(cp, fontFamily: 'MaterialIcons');
   }
 }
 

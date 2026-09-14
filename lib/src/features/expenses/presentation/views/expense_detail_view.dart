@@ -1,5 +1,6 @@
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -31,8 +32,10 @@ class ExpenseDetailView extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Editar',
-            onPressed: () =>
-                context.push('/expenses/${expense.id}/edit', extra: expense),
+            onPressed: () => context.push(
+              AppRoute.expenseEdit(expense.id.toString()),
+              extra: expense,
+            ),
           ),
         ],
       ),

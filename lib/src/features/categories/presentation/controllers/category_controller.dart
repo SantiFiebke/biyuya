@@ -47,17 +47,23 @@ class CategoryController extends _$CategoryController {
       return false;
     }
 
+    final previous = state.value ?? [];
+
+    state = const AsyncLoading();
+
     final repository = ref.read(categoryRepositoryProvider);
+
     final result = await repository.createCategory(
       name: name,
       color: color,
       icon: icon,
       householdId: int.parse(householdId),
     );
+
     // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
     return result.when(
       (category) {
-        state = AsyncData([...state.value ?? [], category]);
+        state = AsyncData([...previous, category]);
         return true;
       },
       (failure) {
@@ -73,21 +79,26 @@ class CategoryController extends _$CategoryController {
     String? color,
     String? icon,
   }) async {
+    final previous = state.value ?? [];
+
+    state = const AsyncLoading();
+
     final repository = ref.read(categoryRepositoryProvider);
+
     final result = await repository.updateCategory(
       id: id,
       name: name,
       color: color,
       icon: icon,
     );
+
     // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
     return result.when(
       (updated) {
-        final categories = state.value ?? [];
-        final index = categories.indexWhere((c) => c.id == id);
+        final index = previous.indexWhere((c) => c.id == id);
         if (index != -1) {
-          categories[index] = updated;
-          state = AsyncData(List.from(categories));
+          previous[index] = updated;
+          state = AsyncData(List.from(previous));
         }
         return true;
       },
@@ -98,14 +109,37 @@ class CategoryController extends _$CategoryController {
     );
   }
 
+  /// Submits a new or updated category.
+  /// Returns true on success, false on error.
+  Future<bool> submitCategory({
+    required String name,
+    String? color,
+    String? icon,
+    int? categoryId, // null = create, non-null = update
+  }) {
+    if (categoryId != null) {
+      return updateCategory(
+        id: categoryId,
+        name: name,
+        color: color,
+        icon: icon,
+      );
+    }
+    return createCategory(name: name, color: color, icon: icon);
+  }
+
   Future<bool> deleteCategory({required int id}) async {
+    final previous = state.value ?? [];
+
+    state = const AsyncLoading();
+
     final repository = ref.read(categoryRepositoryProvider);
+
     final result = await repository.deleteCategory(id: id);
     // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
     return result.when(
       (_) {
-        final categories = state.value ?? [];
-        state = AsyncData(categories.where((c) => c.id != id).toList());
+        state = AsyncData(previous.where((c) => c.id != id).toList());
         return true;
       },
       (failure) {

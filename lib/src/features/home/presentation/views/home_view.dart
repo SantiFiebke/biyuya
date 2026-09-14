@@ -1,12 +1,14 @@
-import 'dart:async';
-
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
+import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/presentation/views/expense_list_view.dart';
+import 'package:biyuya/src/features/home/presentation/widgets/edit_household_dialog.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/invite_code_sheet.dart';
+import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -27,12 +29,12 @@ class HomeView extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.category_outlined),
             tooltip: 'Categorías',
-            onPressed: () => context.push('/categories'),
+            onPressed: () => context.push(AppRoute.categories.path),
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
             tooltip: 'Perfil',
-            onPressed: () => context.push('/profile'),
+            onPressed: () => context.push(AppRoute.profile.path),
           ),
         ],
       ),
@@ -47,7 +49,7 @@ class HomeView extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/expenses/new'),
+        onPressed: () => context.push(AppRoute.expenseNew.path),
         child: const Icon(Icons.add),
       ),
     );
@@ -80,7 +82,7 @@ class _HomeContent extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => context.push('/expenses'),
+                  onPressed: () => context.push(AppRoute.expenses.path),
                   child: const Text('Ver todos'),
                 ),
               ],
@@ -97,9 +99,7 @@ class _HomeContent extends StatelessWidget {
           ),
           data: (expenseList) {
             if (expenseList.isEmpty) {
-              return SliverFillRemaining(
-                child: _EmptyExpenses(hasCategories: userProfile.hasHousehold),
-              );
+              return const SliverFillRemaining(child: EmptyExpenses());
             }
             final recentExpenses = expenseList.take(15).toList();
             return SliverList(
@@ -195,59 +195,16 @@ class _HouseholdHeader extends ConsumerWidget {
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Editar nombre',
-                onPressed: () => _showEditHouseholdDialog(context, ref),
+                onPressed: () => showEditHouseholdDialog(context, ref),
               ),
               IconButton(
                 icon: const Icon(Icons.bar_chart_outlined),
                 tooltip: 'Reportes',
-                onPressed: () => context.push('/reports'),
+                onPressed: () => context.push(AppRoute.reports.path),
               ),
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  void _showEditHouseholdDialog(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(
-      text: ref.read(householdNameProvider).value?.name ?? '',
-    );
-
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Editar nombre del hogar'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Nombre',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final name = controller.text.trim();
-                if (name.isEmpty) {
-                  return;
-                }
-                await ref.read(householdNameProvider.notifier).updateName(name);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -286,7 +243,10 @@ class _RecentExpenseTile extends StatelessWidget {
           context,
         ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
       ),
-      onTap: () => context.push('/expenses/${expense.id}', extra: expense),
+      onTap: () => context.push(
+        AppRoute.expenseDetail(expense.id.toString()),
+        extra: expense,
+      ),
     );
   }
 }
@@ -304,8 +264,9 @@ class _ExpenseCategoryIcon extends ConsumerWidget {
         .firstOrNull;
 
     final color =
-        _parseColor(category?.color) ?? Theme.of(context).colorScheme.primary;
-    final icon = _iconFromCodePoint(category?.icon);
+        parseCategoryColor(category?.color) ??
+        Theme.of(context).colorScheme.primary;
+    final icon = iconFromCodePoint(category?.icon);
 
     return Container(
       width: 40,
@@ -315,68 +276,6 @@ class _ExpenseCategoryIcon extends ConsumerWidget {
         shape: BoxShape.circle,
       ),
       child: Icon(icon, color: color, size: 20),
-    );
-  }
-
-  Color? _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) {
-      return null;
-    }
-    final clean = hex.replaceFirst('#', '');
-    if (clean.length != 6) {
-      return null;
-    }
-    return Color(int.parse('FF$clean', radix: 16));
-  }
-
-  static const _categoryIcon = Icon(Icons.category);
-
-  IconData _iconFromCodePoint(String? codePoint) {
-    if (codePoint == null) {
-      return _categoryIcon.icon ?? Icons.category;
-    }
-    final cp = int.tryParse(codePoint);
-    if (cp == null) {
-      return _categoryIcon.icon ?? Icons.category;
-    }
-    // ponytail: dynamic IconData from codePoint can't be const
-    // ignore: non_const_argument_for_const_parameter
-    return IconData(cp, fontFamily: 'MaterialIcons');
-  }
-}
-
-class _EmptyExpenses extends StatelessWidget {
-  const _EmptyExpenses({required this.hasCategories});
-
-  final bool hasCategories;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No hay gastos registrados',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              ' Registrá tu primer gasto con el botón +',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

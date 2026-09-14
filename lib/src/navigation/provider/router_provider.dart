@@ -5,6 +5,7 @@ import 'package:biyuya/src/features/expenses/expenses.dart';
 import 'package:biyuya/src/features/home/home.dart';
 import 'package:biyuya/src/features/profile/profile.dart';
 import 'package:biyuya/src/features/reports/reports.dart';
+import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -24,52 +25,61 @@ GoRouter router(Ref ref) {
   final refreshNotifier = RouterRefreshNotifier(ref);
 
   return GoRouter(
-    initialLocation: '/splash',
+    initialLocation: AppRoute.splash.path,
     refreshListenable: refreshNotifier,
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginView()),
       GoRoute(
-        path: '/register',
+        path: AppRoute.splash.path,
+        builder: (context, state) => const SplashPage(),
+      ),
+      GoRoute(
+        path: AppRoute.login.path,
+        builder: (context, state) => const LoginView(),
+      ),
+      GoRoute(
+        path: AppRoute.register.path,
         builder: (context, state) => const RegisterView(),
       ),
       GoRoute(
-        path: '/onboarding',
+        path: AppRoute.onboarding.path,
         builder: (context, state) => const OnboardingView(),
       ),
-      GoRoute(path: '/home', builder: (context, state) => const HomeView()),
       GoRoute(
-        path: '/categories',
+        path: AppRoute.home.path,
+        builder: (context, state) => const HomeView(),
+      ),
+      GoRoute(
+        path: AppRoute.categories.path,
         builder: (context, state) => const CategoryListView(),
       ),
       GoRoute(
-        path: '/categories/new',
+        path: AppRoute.categoryNew.path,
         builder: (context, state) => const CategoryFormView(),
       ),
       GoRoute(
-        path: '/categories/:id/edit',
+        path: '${AppRoute.categories.path}/:id/edit',
         builder: (context, state) {
           final category = state.extra as Category?;
           return CategoryFormView(category: category);
         },
       ),
       GoRoute(
-        path: '/expenses',
+        path: AppRoute.expenses.path,
         builder: (context, state) => const ExpenseListView(),
       ),
       GoRoute(
-        path: '/expenses/new',
+        path: AppRoute.expenseNew.path,
         builder: (context, state) => const ExpenseFormView(),
       ),
       GoRoute(
-        path: '/expenses/:id/edit',
+        path: '${AppRoute.expenses.path}/:id/edit',
         builder: (context, state) {
           final expense = state.extra as Expense?;
           return ExpenseFormView(expense: expense);
         },
       ),
       GoRoute(
-        path: '/expenses/:id',
+        path: '${AppRoute.expenses.path}/:id',
         builder: (context, state) {
           final expense = state.extra as Expense?;
           if (expense == null) {
@@ -81,11 +91,11 @@ GoRouter router(Ref ref) {
         },
       ),
       GoRoute(
-        path: '/reports',
+        path: AppRoute.reports.path,
         builder: (context, state) => const ReportView(),
       ),
       GoRoute(
-        path: '/profile',
+        path: AppRoute.profile.path,
         builder: (context, state) => const ProfileView(),
       ),
     ],
@@ -94,44 +104,47 @@ GoRouter router(Ref ref) {
 
       return authSessionAsync.when(
         data: (userProfile) {
-          FlutterNativeSplash.remove();
-
-          final isLoggingIn = state.matchedLocation == '/login';
-          final isRegistering = state.matchedLocation == '/register';
-          final isVerifyingEmail = state.matchedLocation == '/verify-email';
+          final loc = state.matchedLocation;
+          final isLoggingIn = loc == AppRoute.login.path;
+          final isRegistering = loc == AppRoute.register.path;
+          final isVerifyingEmail = loc == AppRoute.verifyEmail.path;
 
           // 1. Sin sesión
           if (userProfile == null) {
+            FlutterNativeSplash.remove();
             return (isLoggingIn || isRegistering || isVerifyingEmail)
                 ? null
-                : '/login';
+                : AppRoute.login.path;
           }
+
+          // Auth resolved with valid user — remove native splash
+          FlutterNativeSplash.remove();
 
           // 2. Con sesión activa pero sin hogar
           if (!userProfile.hasHousehold) {
-            return state.matchedLocation == '/onboarding'
+            return loc == AppRoute.onboarding.path
                 ? null
-                : '/onboarding';
+                : AppRoute.onboarding.path;
           }
 
           // 3. Con sesión y con hogar
           if (isLoggingIn ||
               isRegistering ||
               isVerifyingEmail ||
-              state.matchedLocation == '/splash' ||
-              state.matchedLocation == '/onboarding') {
-            return '/home';
+              loc == AppRoute.splash.path ||
+              loc == AppRoute.onboarding.path) {
+            return AppRoute.home.path;
           }
 
           return null;
         },
         error: (_, _) {
           FlutterNativeSplash.remove();
-          return '/login';
+          return AppRoute.login.path;
         },
         loading: () {
           // Mantiene /splash (mientras el Splash Nativo aún sigue visible cubriéndolo)
-          return '/splash';
+          return AppRoute.splash.path;
         },
       );
     },

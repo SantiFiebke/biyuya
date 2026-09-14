@@ -1,9 +1,10 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
+import 'package:biyuya/src/core/presentation/dialogs/confirm_action_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
-import 'package:biyuya/src/features/auth/provider/auth_repository_provider.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
+import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -167,7 +168,7 @@ class _MenuItems extends StatelessWidget {
             title: const Text('Categorías'),
             subtitle: const Text('Gestionar categorías de gastos'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/categories'),
+            onTap: () => context.push(AppRoute.categories.path),
           ),
           const Divider(height: 1),
           ListTile(
@@ -175,7 +176,7 @@ class _MenuItems extends StatelessWidget {
             title: const Text('Reportes'),
             subtitle: const Text('Ver reportes mensuales'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/reports'),
+            onTap: () => context.push(AppRoute.reports.path),
           ),
         ],
       ),
@@ -190,39 +191,23 @@ class _LogoutButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return OutlinedButton.icon(
       onPressed: () async {
-        final confirmed = await showDialog<bool>(
+        final confirmed = await showConfirmActionDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Cerrar sesión'),
-            content: const Text('¿Estás segura de que querés cerrar sesión?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.error,
-                ),
-                child: const Text('Cerrar sesión'),
-              ),
-            ],
-          ),
+          title: 'Cerrar sesión',
+          content: '¿Estás segura de que querés cerrar sesión?',
+          confirmLabel: 'Cerrar sesión',
+          isDestructive: true,
         );
+        if (!confirmed || !context.mounted) {
+          return;
+        }
 
-        if (confirmed == true && context.mounted) {
-          final result = await ref.read(authRepositoryProvider).signOut();
-          result.when(
-            (_) {
-              if (context.mounted) {
-                context.go('/login');
-              }
-            },
-            (failure) {
-              context.showErrorSnackBar(failure.message);
-            },
-          );
+        try {
+          await ref.read(authSessionControllerProvider.notifier).signOut();
+        } on Exception catch (e) {
+          if (context.mounted) {
+            context.showErrorSnackBar(e.toString());
+          }
         }
       },
       icon: const Icon(Icons.logout),

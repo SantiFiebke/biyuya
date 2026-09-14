@@ -1,25 +1,17 @@
+import 'package:biyuya/src/core/presentation/dialogs/confirm_action_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/presentation/widgets/category_filter_sheet.dart';
+import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
-
 import 'package:skeletonizer/skeletonizer.dart';
-
-Color? _parseColor(String? hex) {
-  if (hex == null || hex.isEmpty) {
-    return null;
-  }
-  final clean = hex.replaceFirst('#', '');
-  if (clean.length != 6) {
-    return null;
-  }
-  return Color(int.parse('FF$clean', radix: 16));
-}
 
 class ExpenseListView extends ConsumerStatefulWidget {
   const ExpenseListView({super.key});
@@ -43,34 +35,10 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
   }
 
   Future<void> _showCategoryFilter(BuildContext context) async {
-    final categories = ref.read(categoryControllerProvider).value ?? [];
-
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Todas las categorías'),
-              onTap: () {
-                setState(() => _selectedCategoryId = null);
-                Navigator.pop(context);
-              },
-            ),
-            ...categories.map(
-              (category) => ListTile(
-                title: Text(category.name),
-                leading: Icon(Icons.circle, color: _parseColor(category.color)),
-                onTap: () {
-                  setState(() => _selectedCategoryId = category.id);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+    await showCategoryFilterSheet(
+      context,
+      ref,
+      onSelected: (id) => setState(() => _selectedCategoryId = id),
     );
   }
 
@@ -172,7 +140,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
                     return ExpenseTile(
                       expense: expense,
                       onTap: () => context.push(
-                        '/expenses/edit/${expense.id}',
+                        AppRoute.expenseEdit(expense.id.toString()),
                         extra: expense,
                       ),
                       onDelete: () => _confirmDelete(context, ref, expense),
@@ -185,7 +153,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/expenses/new'),
+        onPressed: () => context.push(AppRoute.expenseNew.path),
         child: const Icon(Icons.add),
       ),
     );
@@ -196,29 +164,15 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     WidgetRef ref,
     Expense expense,
   ) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showConfirmActionDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar gasto'),
-        content: Text(
+      title: 'Eliminar gasto',
+      content:
           '¿Estás segura de que querés eliminar este gasto de \$${expense.amount.toStringAsFixed(2)}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Eliminar',
+      isDestructive: true,
     );
-    if (confirmed == true) {
+    if (confirmed) {
       await ref
           .read(expenseControllerProvider.notifier)
           .deleteExpense(id: expense.id);
@@ -287,8 +241,8 @@ class ExpenseCategoryAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _parseColor(category?.color);
-    final icon = _iconFromCodePoint(category?.icon);
+    final color = parseCategoryColor(category?.color);
+    final icon = iconFromCodePoint(category?.icon);
 
     return Container(
       width: 40,
@@ -306,19 +260,6 @@ class ExpenseCategoryAvatar extends StatelessWidget {
       ),
     );
   }
-}
-
-IconData _iconFromCodePoint(String? codePoint) {
-  if (codePoint == null) {
-    return Icons.category;
-  }
-  final cp = int.tryParse(codePoint);
-  if (cp == null) {
-    return Icons.category;
-  }
-  // Runtime-parsed icon code from DB cannot be const
-  // ignore: non_const_argument_for_const_parameter
-  return IconData(cp, fontFamily: 'MaterialIcons');
 }
 
 class EmptyExpenses extends StatelessWidget {

@@ -1,8 +1,8 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
-import 'package:biyuya/src/features/categories/domain/entities/category.dart';
-import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/presentation/widgets/category_dropdown.dart';
+import 'package:biyuya/src/features/expenses/presentation/widgets/create_category_bottom_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -21,11 +21,12 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
   late final TextEditingController _descriptionController;
-  int? _selectedCategoryId;
   late DateTime _selectedDate;
-  bool _saving = false;
+  int? _selectedCategoryId;
 
   bool get isEditing => widget.expense != null;
+
+  bool get _saving => ref.watch(expenseControllerProvider).isLoading;
 
   @override
   void initState() {
@@ -63,115 +64,10 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
     }
   }
 
-  Future<void> _showCreateCategorySheet() async {
-    final nameController = TextEditingController();
-    String? selectedColor;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Nueva categoría',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre',
-                  border: OutlineInputBorder(),
-                ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              // Color picker
-              Wrap(
-                spacing: 8,
-                children:
-                    [
-                      '#F44336',
-                      '#E91E63',
-                      '#9C27B0',
-                      '#673AB7',
-                      '#3F51B5',
-                      '#2196F3',
-                      '#4CAF50',
-                      '#FF9800',
-                      '#795548',
-                      '#607D8B',
-                    ].map((hex) {
-                      final color = Color(
-                        int.parse('FF${hex.substring(1)}', radix: 16),
-                      );
-                      return GestureDetector(
-                        onTap: () => setSheetState(() => selectedColor = hex),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: selectedColor == hex
-                                ? Border.all(color: Colors.white, width: 3)
-                                : null,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () async {
-                  if (nameController.text.trim().isEmpty) {
-                    return;
-                  }
-
-                  final success = await ref
-                      .read(categoryControllerProvider.notifier)
-                      .createCategory(
-                        name: nameController.text.trim(),
-                        color: selectedColor,
-                      );
-
-                  if (success && context.mounted) {
-                    Navigator.pop(context);
-                    // Auto-select the newly created category
-                    final newCategories =
-                        ref.read(categoryControllerProvider).value ?? [];
-                    if (newCategories.isNotEmpty) {
-                      setState(
-                        () => _selectedCategoryId = newCategories.last.id,
-                      );
-                    }
-                  }
-                },
-                child: const Text('Crear'),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
     if (_selectedCategoryId == null) {
       context.showErrorSnackBar('Elegí una categoría');
       return;
@@ -183,36 +79,20 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
       return;
     }
 
-    setState(() => _saving = true);
-
     final description = _descriptionController.text.trim();
-    bool success;
-
-    if (isEditing) {
-      success = await ref
-          .read(expenseControllerProvider.notifier)
-          .updateExpense(
-            id: widget.expense!.id,
-            amount: amount,
-            date: _selectedDate,
-            description: description.isEmpty ? null : description,
-            categoryId: _selectedCategoryId!,
-          );
-    } else {
-      success = await ref
-          .read(expenseControllerProvider.notifier)
-          .createExpense(
-            amount: amount,
-            date: _selectedDate,
-            description: description.isEmpty ? null : description,
-            categoryId: _selectedCategoryId!,
-          );
-    }
+    final success = await ref
+        .read(expenseControllerProvider.notifier)
+        .submitExpense(
+          amount: amount,
+          description: description.isEmpty ? null : description,
+          categoryId: _selectedCategoryId!,
+          date: _selectedDate,
+          expenseId: widget.expense?.id,
+        );
 
     if (!mounted) {
       return;
     }
-    setState(() => _saving = false);
 
     if (success) {
       context
@@ -257,12 +137,15 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                 },
               ),
               const SizedBox(height: 24),
-              _CategoryDropdown(
+              CategoryDropdown(
                 selectedCategoryId: _selectedCategoryId,
                 enabled: !_saving,
                 onChanged: (id) async {
                   if (id == -1) {
-                    await _showCreateCategorySheet();
+                    final newId = await showCreateCategorySheet(context, ref);
+                    if (newId != null) {
+                      setState(() => _selectedCategoryId = newId);
+                    }
                   } else {
                     setState(() => _selectedCategoryId = id);
                   }
@@ -306,119 +189,6 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
         ),
       ),
     );
-  }
-}
-
-class _CategoryDropdown extends ConsumerWidget {
-  const _CategoryDropdown({
-    required this.selectedCategoryId,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final int? selectedCategoryId;
-  final bool enabled;
-  final ValueChanged<int?> onChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final asyncCategories = ref.watch(categoryControllerProvider);
-
-    return asyncCategories.when(
-      loading: () => DropdownButtonFormField<int>(
-        decoration: const InputDecoration(
-          labelText: 'Categoría',
-          prefixIcon: Icon(Icons.category_outlined),
-        ),
-        items: const [],
-        disabledHint: const Text('Cargando categorías...'),
-        onChanged: null,
-      ),
-      error: (_, _) => DropdownButtonFormField<int>(
-        decoration: const InputDecoration(
-          labelText: 'Categoría',
-          prefixIcon: Icon(Icons.category_outlined),
-        ),
-        items: const [],
-        disabledHint: const Text('Error al cargar categorías'),
-        onChanged: null,
-      ),
-      data: (categories) => DropdownButtonFormField<int>(
-        initialValue: selectedCategoryId,
-        decoration: const InputDecoration(
-          labelText: 'Categoría',
-          prefixIcon: Icon(Icons.category_outlined),
-        ),
-        items: [
-          ...categories.map(_buildItem),
-          const DropdownMenuItem<int>(
-            value: -1,
-            child: Row(
-              children: [
-                Icon(Icons.add_circle_outline, size: 20),
-                SizedBox(width: 8),
-                Text('Crear nueva categoría'),
-              ],
-            ),
-          ),
-        ],
-        onChanged: enabled ? onChanged : null,
-        validator: (value) {
-          if (value == null || value == -1) {
-            return 'Elegí una categoría';
-          }
-          return null;
-        },
-      ),
-    );
-  }
-
-  DropdownMenuItem<int> _buildItem(Category category) {
-    final color = _parseColor(category.color);
-    final icon = _iconFromCodePoint(category.icon);
-
-    return DropdownMenuItem(
-      value: category.id,
-      child: Row(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: (color ?? Colors.grey).withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 14, color: color ?? Colors.grey),
-          ),
-          const SizedBox(width: 12),
-          Text(category.name),
-        ],
-      ),
-    );
-  }
-
-  Color? _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) {
-      return null;
-    }
-    final clean = hex.replaceFirst('#', '');
-    if (clean.length != 6) {
-      return null;
-    }
-    return Color(int.parse('FF$clean', radix: 16));
-  }
-
-  IconData _iconFromCodePoint(String? codePoint) {
-    if (codePoint == null) {
-      return Icons.category;
-    }
-    final cp = int.tryParse(codePoint);
-    if (cp == null) {
-      return Icons.category;
-    }
-    // Runtime-parsed icon code from DB cannot be const
-    // ignore: non_const_argument_for_const_parameter
-    return IconData(cp, fontFamily: 'MaterialIcons');
   }
 }
 

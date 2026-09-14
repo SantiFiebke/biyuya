@@ -45,14 +45,12 @@ class AuthFormController extends _$AuthFormController {
   void _handleResult<T, E>(Result<T, E> result) {
     result.when(
       (success) {
-        // Al tener éxito, no alteramos 'state' con data pesada. El Stream
-        // nativo de Supabase en AuthSessionController reaccionará y gatillará
-        // la navegación.
-        state = const AsyncData(null);
+        // Leave state as AsyncLoading — button stays disabled until
+        // GoRouter redirect disposes this view after Supabase auth
+        // stream fires. Setting AsyncData here would re-enable the
+        // button, creating a race condition window for double-click.
       },
       (failure) {
-        // Encapsulamos el AuthFailure dentro del AsyncError para que la UI
-        // lo maneje con un SnackBar o Banner
         state = AsyncError(failure as Object, StackTrace.current);
       },
     );

@@ -80,6 +80,8 @@ class ExpenseController extends _$ExpenseController {
       return false;
     }
 
+    final previous = state.value ?? [];
+    state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.createExpense(
       amount: amount,
@@ -89,11 +91,10 @@ class ExpenseController extends _$ExpenseController {
       categoryId: categoryId,
       userUuid: userUuid,
     );
-    // The `when` callback runs synchronously on the result; no await needed.
-    // ignore: async_return_with_no_await
-    return result.when(
+
+    return await result.when(
       (expense) {
-        state = AsyncData([expense, ...state.value ?? []]);
+        state = AsyncData([expense, ...previous]);
         ref.invalidate(reportControllerProvider);
         return true;
       },
@@ -111,6 +112,8 @@ class ExpenseController extends _$ExpenseController {
     required int categoryId,
     String? description,
   }) async {
+    final previous = state.value ?? [];
+    state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.updateExpense(
       id: id,
@@ -119,17 +122,15 @@ class ExpenseController extends _$ExpenseController {
       description: description,
       categoryId: categoryId,
     );
-    // The `when` callback runs synchronously on the result; no await needed.
-    // ignore: async_return_with_no_await
-    return result.when(
+
+    return await result.when(
       (updated) {
-        final expenses = state.value ?? [];
-        final index = expenses.indexWhere((e) => e.id == id);
+        final index = previous.indexWhere((e) => e.id == id);
         if (index != -1) {
-          expenses[index] = updated;
-          state = AsyncData(List.from(expenses));
-          ref.invalidate(reportControllerProvider);
+          previous[index] = updated;
         }
+        state = AsyncData(List.from(previous));
+        ref.invalidate(reportControllerProvider);
         return true;
       },
       (failure) {
@@ -139,15 +140,44 @@ class ExpenseController extends _$ExpenseController {
     );
   }
 
+  /// Submits a new or updated expense.
+  /// Returns true on success, false on error.
+  Future<bool> submitExpense({
+    required double amount,
+    required int categoryId,
+    required DateTime date,
+    String? description,
+    int? expenseId,
+  }) async {
+    if (expenseId != null) {
+      return await updateExpense(
+        id: expenseId,
+        amount: amount,
+        date: date,
+        description: description,
+        categoryId: categoryId,
+      );
+    }
+    return await createExpense(
+      amount: amount,
+      date: date,
+      description: description,
+      categoryId: categoryId,
+    );
+  }
+
   Future<bool> deleteExpense({required int id}) async {
+    final previous = state.value ?? [];
+
+    state = const AsyncLoading();
+
     final repository = ref.read(expenseRepositoryProvider);
+
     final result = await repository.deleteExpense(id: id);
-    // The `when` callback runs synchronously on the result; no await needed.
-    // ignore: async_return_with_no_await
-    return result.when(
+
+    return await result.when(
       (_) {
-        final expenses = state.value ?? [];
-        state = AsyncData(expenses.where((e) => e.id != id).toList());
+        state = AsyncData(previous.where((e) => e.id != id).toList());
         ref.invalidate(reportControllerProvider);
         return true;
       },

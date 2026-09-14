@@ -1,6 +1,5 @@
-import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
-import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,7 +52,8 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
   late final TextEditingController _nameController;
   String? _selectedColor;
   IconData? _selectedIcon;
-  bool _saving = false;
+
+  bool get _saving => ref.watch(categoryControllerProvider).isLoading;
 
   bool get isEditing => widget.category != null;
 
@@ -77,48 +77,27 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
     super.dispose();
   }
 
-  UserProfile? get _userProfile =>
-      ref.read(authSessionControllerProvider).value;
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final householdId = _userProfile?.householdId;
-    if (householdId == null || householdId.isEmpty) {
-      context.showErrorSnackBar('No se encontró el hogar del usuario');
-      return;
-    }
-
-    setState(() => _saving = true);
-
+    final name = _nameController.text.trim();
     final iconCode = _selectedIcon?.codePoint.toString();
-    bool success;
+    final categoryId = widget.category?.id;
 
-    if (isEditing) {
-      success = await ref
-          .read(categoryControllerProvider.notifier)
-          .updateCategory(
-            id: widget.category!.id,
-            name: _nameController.text.trim(),
-            color: _selectedColor,
-            icon: iconCode,
-          );
-    } else {
-      success = await ref
-          .read(categoryControllerProvider.notifier)
-          .createCategory(
-            name: _nameController.text.trim(),
-            color: _selectedColor,
-            icon: iconCode,
-          );
-    }
+    final success = await ref
+        .read(categoryControllerProvider.notifier)
+        .submitCategory(
+          name: name,
+          color: _selectedColor,
+          icon: iconCode,
+          categoryId: categoryId,
+        );
 
     if (!mounted) {
       return;
     }
-    setState(() => _saving = false);
 
     if (success) {
       context
@@ -207,20 +186,9 @@ class ColorPickerRow extends StatelessWidget {
   final String? selectedColor;
   final ValueChanged<String?> onColorSelected;
 
-  Color? _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) {
-      return null;
-    }
-    final clean = hex.replaceFirst('#', '');
-    if (clean.length != 6) {
-      return null;
-    }
-    return Color(int.parse('FF$clean', radix: 16));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final parsedSelected = _parseColor(selectedColor);
+    final parsedSelected = parseCategoryColor(selectedColor);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -232,10 +200,10 @@ class ColorPickerRow extends StatelessWidget {
           children: [
             for (final hex in _presetColors)
               _ColorCircle(
-                color: _parseColor(hex)!,
-                isSelected: parsedSelected == _parseColor(hex),
+                color: parseCategoryColor(hex)!,
+                isSelected: parsedSelected == parseCategoryColor(hex),
                 onTap: () => onColorSelected(
-                  parsedSelected == _parseColor(hex) ? null : hex,
+                  parsedSelected == parseCategoryColor(hex) ? null : hex,
                 ),
               ),
           ],

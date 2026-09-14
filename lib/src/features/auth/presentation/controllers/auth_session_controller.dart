@@ -12,13 +12,18 @@ class AuthSessionController extends _$AuthSessionController {
   StreamSubscription<UserProfile?>? _profileSubscription;
 
   @override
-  FutureOr<UserProfile?> build() async {
+  FutureOr<UserProfile?> build() {
     final authRepository = ref.watch(authRepositoryProvider);
+    final completer = Completer<UserProfile?>();
 
     // Stream 1: auth events (login/logout/token refresh)
     final authSubscription = authRepository.onAuthStateChanged.listen(
       (userProfile) {
         state = AsyncData(userProfile);
+
+        if (!completer.isCompleted) {
+          completer.complete(userProfile);
+        }
 
         // When auth changes, also subscribe to profile changes for this user
         if (userProfile != null) {
@@ -27,13 +32,25 @@ class AuthSessionController extends _$AuthSessionController {
       },
       onError: (Object error, StackTrace stackTrace) {
         state = AsyncError(error, stackTrace);
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
       },
     );
 
     ref.onDispose(authSubscription.cancel);
     ref.onDispose(() => _profileSubscription?.cancel());
 
-    return null;
+    return completer.future;
+  }
+
+  Future<void> signOut() async {
+    final repository = ref.read(authRepositoryProvider);
+    final result = await repository.signOut();
+    result.when((success) {
+      unawaited(_profileSubscription?.cancel());
+      _profileSubscription = null;
+    }, (failure) => throw Exception(failure.message));
   }
 
   void _subscribeToProfileChanges(
