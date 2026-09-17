@@ -1,7 +1,7 @@
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shows a modal bottom sheet with category list.
 /// Calls [onSelected] with selected category id, or null for "all".

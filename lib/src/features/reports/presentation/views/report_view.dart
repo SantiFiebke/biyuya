@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/category_expenses_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
@@ -53,7 +56,19 @@ class ReportView extends ConsumerWidget {
           if (report == null) {
             return const Center(child: Text('No hay datos para este mes'));
           }
-          return ReportContent(report: report);
+          return ReportContent(
+            report: report,
+            onCategoryTap: (breakdown) {
+              unawaited(
+                CategoryExpensesSheet.show(
+                  context,
+                  breakdown: breakdown,
+                  year: report.year,
+                  month: report.month,
+                ),
+              );
+            },
+          );
         },
       ),
     );
@@ -61,9 +76,14 @@ class ReportView extends ConsumerWidget {
 }
 
 class ReportContent extends StatelessWidget {
-  const ReportContent({required this.report, super.key});
+  const ReportContent({
+    required this.report,
+    required this.onCategoryTap,
+    super.key,
+  });
 
   final MonthlyReport report;
+  final void Function(CategoryBreakdown breakdown) onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +126,7 @@ class ReportContent extends StatelessWidget {
               (breakdown) => CategoryBreakdownTile(
                 breakdown: breakdown,
                 amountFormat: amountFormat,
+                onTap: () => onCategoryTap(breakdown),
               ),
             ),
         ],
@@ -216,11 +237,13 @@ class CategoryBreakdownTile extends StatelessWidget {
   const CategoryBreakdownTile({
     required this.breakdown,
     required this.amountFormat,
+    this.onTap,
     super.key,
   });
 
   final CategoryBreakdown breakdown;
   final NumberFormat amountFormat;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +255,7 @@ class CategoryBreakdownTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: onTap,
         leading: Container(
           width: 40,
           height: 40,

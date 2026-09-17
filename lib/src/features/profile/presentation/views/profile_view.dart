@@ -194,7 +194,7 @@ class _LogoutButton extends ConsumerWidget {
         final confirmed = await showConfirmActionDialog(
           context: context,
           title: 'Cerrar sesión',
-          content: '¿Estás segura de que querés cerrar sesión?',
+          content: '¿Estás seguro de que querés cerrar sesión?',
           confirmLabel: 'Cerrar sesión',
           isDestructive: true,
         );

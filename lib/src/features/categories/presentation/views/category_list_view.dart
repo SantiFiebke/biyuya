@@ -48,8 +48,10 @@ class CategoryListView extends ConsumerWidget {
               final category = categories[index];
               return CategoryTile(
                 category: category,
-                onEdit: () =>
-                    context.push(AppRoute.categoryEdit(category.id.toString())),
+                onEdit: () => context.push(
+                  AppRoute.categoryEdit(category.id.toString()),
+                  extra: category,
+                ),
                 onDelete: () => _confirmDelete(context, ref, category),
               );
             },

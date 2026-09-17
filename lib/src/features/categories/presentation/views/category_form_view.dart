@@ -29,7 +29,7 @@ const _presetIcons = <IconData>[
   Icons.fitness_center,
   Icons.pets,
   Icons.child_care,
-  Icons.flight,
+  Icons.drive_eta,
   Icons.music_note,
   Icons.sports_esports,
   Icons.checkroom,
