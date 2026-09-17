@@ -51,3 +51,4 @@ app.*.map.json
 requirements.md
 /docs
 .serena/
+users_feedback.txt

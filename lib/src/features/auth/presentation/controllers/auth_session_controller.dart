@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/data/widget_category_sync.dart';
+import 'package:biyuya/src/core/data/widget_daily_total_sync.dart';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
 import 'package:biyuya/src/features/auth/provider/auth_repository_provider.dart';
@@ -50,6 +52,8 @@ class AuthSessionController extends _$AuthSessionController {
     result.when((success) {
       unawaited(_profileSubscription?.cancel());
       _profileSubscription = null;
+      unawaited(WidgetCategorySync.clearCategories());
+      unawaited(WidgetDailyTotalSync.clearTotal());
     }, (failure) => throw Exception(failure.message));
   }
 

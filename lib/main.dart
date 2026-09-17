@@ -1,5 +1,10 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:biyuya/src/core/core.dart';
+import 'package:biyuya/src/core/models/expense_deep_link_params.dart';
 import 'package:biyuya/src/navigation/provider/router_provider.dart';
+import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:biyuya/theme/theme_builder.dart';
 import 'package:flutter_localizations/flutter_localizations.dart'
@@ -23,11 +28,68 @@ Future<void> main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  late final AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_initDeepLinks());
+  }
+
+  @override
+  void dispose() {
+    unawaited(_linkSubscription?.cancel());
+    super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // Handle cold start deep link
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) {
+        _handleDeepLink(initialLink);
+      }
+    } on Object catch (_) {
+      // No initial link available
+    }
+
+    // Handle subsequent deep links (warm start)
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      _handleDeepLink,
+      onError: (_) {},
+    );
+  }
+
+  void _handleDeepLink(Uri uri) {
+    if (uri.scheme != 'biyuya') {
+      return;
+    }
+    if (uri.host != 'expense' || uri.path != '/new') {
+      return;
+    }
+
+    final params = ExpenseDeepLinkParams.fromUri(uri);
+    ref.read(pendingDeepLinkProvider.notifier).params = params;
+
+    // Delay navigation slightly to let auth redirect resolve first
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(routerProvider).go(AppRoute.expenseNew.path, extra: params);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final brightness = View.of(context).platformDispatcher.platformBrightness;
 
     final textTheme = createTextTheme(context, 'Inter', 'Roboto');

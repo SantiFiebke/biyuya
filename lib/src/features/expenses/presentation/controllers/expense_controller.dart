@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/data/widget_daily_total_sync.dart';
 import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
@@ -31,10 +32,10 @@ class ExpenseController extends _$ExpenseController {
     final result = await repository.getExpenses(
       householdId: int.parse(householdId),
     );
-    result.when(
-      (expenses) => state = AsyncData(expenses),
-      (failure) => state = AsyncError(failure, StackTrace.current),
-    );
+    result.when((expenses) {
+      state = AsyncData(expenses);
+      _syncDailyTotal(expenses);
+    }, (failure) => state = AsyncError(failure, StackTrace.current));
   }
 
   Future<void> loadExpensesByMonth({
@@ -56,14 +57,27 @@ class ExpenseController extends _$ExpenseController {
       year: year,
       month: month,
     );
-    result.when(
-      (expenses) => state = AsyncData(expenses),
-      (failure) => state = AsyncError(failure, StackTrace.current),
-    );
+    result.when((expenses) {
+      state = AsyncData(expenses);
+      _syncDailyTotal(expenses);
+    }, (failure) => state = AsyncError(failure, StackTrace.current));
   }
 
   String? get _userUuid {
     return ref.read(supabaseClientProvider).auth.currentUser?.id;
+  }
+
+  void _syncDailyTotal(List<Expense> expenses) {
+    final now = DateTime.now();
+    final todayTotal = expenses
+        .where(
+          (e) =>
+              e.date.year == now.year &&
+              e.date.month == now.month &&
+              e.date.day == now.day,
+        )
+        .fold<double>(0.0, (sum, e) => sum + e.amount);
+    unawaited(WidgetDailyTotalSync.syncTotal(todayTotal));
   }
 
   Future<bool> createExpense({
@@ -80,7 +94,7 @@ class ExpenseController extends _$ExpenseController {
       return false;
     }
 
-    final previous = state.value ?? [];
+    final List<Expense> previous = state.value ?? [];
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.createExpense(
@@ -94,7 +108,9 @@ class ExpenseController extends _$ExpenseController {
 
     return await result.when(
       (expense) {
-        state = AsyncData([expense, ...previous]);
+        final updated = [expense, ...previous];
+        state = AsyncData(updated);
+        _syncDailyTotal(updated);
         ref.invalidate(reportControllerProvider);
         return true;
       },
@@ -112,7 +128,7 @@ class ExpenseController extends _$ExpenseController {
     required int categoryId,
     String? description,
   }) async {
-    final previous = state.value ?? [];
+    final List<Expense> previous = state.value ?? [];
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.updateExpense(
@@ -129,7 +145,9 @@ class ExpenseController extends _$ExpenseController {
         if (index != -1) {
           previous[index] = updated;
         }
-        state = AsyncData(List.from(previous));
+        final updatedList = List<Expense>.from(previous);
+        state = AsyncData(updatedList);
+        _syncDailyTotal(updatedList);
         ref.invalidate(reportControllerProvider);
         return true;
       },
@@ -167,7 +185,7 @@ class ExpenseController extends _$ExpenseController {
   }
 
   Future<bool> deleteExpense({required int id}) async {
-    final previous = state.value ?? [];
+    final List<Expense> previous = state.value ?? [];
 
     state = const AsyncLoading();
 
@@ -177,7 +195,9 @@ class ExpenseController extends _$ExpenseController {
 
     return await result.when(
       (_) {
-        state = AsyncData(previous.where((e) => e.id != id).toList());
+        final remaining = previous.where((e) => e.id != id).toList();
+        state = AsyncData(remaining);
+        _syncDailyTotal(remaining);
         ref.invalidate(reportControllerProvider);
         return true;
       },
