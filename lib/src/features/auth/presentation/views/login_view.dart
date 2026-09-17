@@ -62,6 +62,13 @@ class _LoginViewState extends ConsumerState<LoginView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Center(
+                    child: Image.asset(
+                      'images/logo_no_background.png',
+                      width: 150,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   Text(
                     'Cuentas claras',
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
