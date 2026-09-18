@@ -1,9 +1,5 @@
-import 'dart:async';
-
-import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/categories/data/repositories/category_repository_impl.dart';
-import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/domain/repositories/category_repository_base.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/categories/provider/category_repository_provider.dart';
@@ -12,42 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
 
+import '../../../../helpers/test_helpers.dart';
+
 class MockCategoryRepository extends Mock implements CategoryRepositoryImpl {}
 
-class _FakeAuthSessionController extends AuthSessionController {
-  @override
-  FutureOr<UserProfile?> build() => const UserProfile(
-    id: 'test-user-id',
-    name: 'Test',
-    lastName: 'User',
-    householdId: '1',
-  );
-}
-
-Category _makeCategory({
-  int id = 1,
-  String name = 'Test',
-  int householdId = 1,
-}) {
-  return Category(
-    id: id,
-    name: name,
-    householdId: householdId,
-    createdAt: DateTime(2025),
-    color: '#4CAF50',
-    icon: '63046',
-  );
-}
-
-/// Wait for build()'s Future.microtask auto-load to settle.
-Future<void> _waitForLoad() async {
-  // First delay: microtask runs, hits await on repository
-  await Future<void>.delayed(Duration.zero);
-  // Second delay: repository future resolves, state updates
-  await Future<void>.delayed(Duration.zero);
-}
-
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late MockCategoryRepository mockRepo;
   late ProviderContainer container;
 
@@ -62,7 +29,7 @@ void main() {
       overrides: [
         categoryRepositoryProvider.overrideWithValue(mockRepo),
         authSessionControllerProvider.overrideWith(
-          _FakeAuthSessionController.new,
+          FakeAuthSessionController.new,
         ),
       ],
     );
@@ -80,15 +47,15 @@ void main() {
 
     test('build auto-loads categories from repository', () async {
       final categories = [
-        _makeCategory(name: 'Food'),
-        _makeCategory(id: 2, name: 'Transport'),
+        makeCategory(name: 'Food'),
+        makeCategory(id: 2, name: 'Transport'),
       ];
       when(
         () => mockRepo.getCategories(householdId: 1),
       ).thenAnswer((_) async => Success(categories));
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final state = container.read(categoryControllerProvider);
       expect(state.value, hasLength(2));
@@ -101,19 +68,19 @@ void main() {
       ).thenAnswer((_) async => const Error(CategoryFailure('db error')));
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       expect(container.read(categoryControllerProvider).hasError, isTrue);
     });
 
     test('createCategory adds category to state and returns true', () async {
-      final newCat = _makeCategory(id: 3, name: 'New');
+      final newCat = makeCategory(id: 3, name: 'New');
       when(
         () => mockRepo.createCategory(name: 'New', householdId: 1),
       ).thenAnswer((_) async => Success(newCat));
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(categoryControllerProvider.notifier);
       final result = await notifier.createCategory(name: 'New');
@@ -130,7 +97,7 @@ void main() {
       ).thenAnswer((_) async => const Error(CategoryFailure('fail')));
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(categoryControllerProvider.notifier);
       final result = await notifier.createCategory(name: 'Fail');
@@ -140,15 +107,15 @@ void main() {
     });
 
     test('updateCategory updates existing category in state', () async {
-      final initial = _makeCategory(id: 5, name: 'Old');
+      final initial = makeCategory(id: 5, name: 'Old');
       when(
         () => mockRepo.getCategories(householdId: 1),
       ).thenAnswer((_) async => Success([initial]));
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
-      final updated = _makeCategory(id: 5, name: 'Updated');
+      final updated = makeCategory(id: 5, name: 'Updated');
       when(
         () => mockRepo.updateCategory(id: 5, name: 'Updated'),
       ).thenAnswer((_) async => Success(updated));
@@ -167,7 +134,7 @@ void main() {
       ).thenAnswer((_) async => const Error(CategoryFailure('err')));
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(categoryControllerProvider.notifier);
       final result = await notifier.updateCategory(id: 5, name: 'X');
@@ -178,14 +145,12 @@ void main() {
 
     test('deleteCategory removes category from state', () async {
       when(() => mockRepo.getCategories(householdId: 1)).thenAnswer(
-        (_) async => Success([
-          _makeCategory(name: 'A'),
-          _makeCategory(id: 2, name: 'B'),
-        ]),
+        (_) async =>
+            Success([makeCategory(name: 'A'), makeCategory(id: 2, name: 'B')]),
       );
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       when(
         () => mockRepo.deleteCategory(id: 1),
@@ -206,7 +171,7 @@ void main() {
       ).thenAnswer((_) async => const Error(CategoryFailure('not found')));
 
       container.read(categoryControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(categoryControllerProvider.notifier);
       final result = await notifier.deleteCategory(id: 99);

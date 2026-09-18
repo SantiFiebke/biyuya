@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:biyuya/src/core/core.dart';
-import 'package:biyuya/src/core/models/expense_deep_link_params.dart';
 import 'package:biyuya/src/navigation/provider/router_provider.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
@@ -79,12 +78,9 @@ class _MyAppState extends ConsumerState<MyApp> {
       return;
     }
 
-    final params = ExpenseDeepLinkParams.fromUri(uri);
-    ref.read(pendingDeepLinkProvider.notifier).params = params;
-
     // Delay navigation slightly to let auth redirect resolve first
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(routerProvider).go(AppRoute.expenseNew.path, extra: params);
+      ref.read(routerProvider).go(AppRoute.expenseNew.path);
     });
   }
 

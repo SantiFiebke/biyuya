@@ -1,9 +1,5 @@
-import 'dart:async';
-
-import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/reports/data/repositories/report_repository_impl.dart';
-import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
@@ -12,42 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
 
+import '../../../../helpers/test_helpers.dart';
+
 class MockReportRepository extends Mock implements ReportRepositoryImpl {}
 
-class _FakeAuthSessionController extends AuthSessionController {
-  @override
-  FutureOr<UserProfile?> build() => const UserProfile(
-    id: 'test-user-id',
-    name: 'Test',
-    lastName: 'User',
-    householdId: '1',
-  );
-}
-
-MonthlyReport _makeReport({
-  double total = 1000,
-  double previousTotal = 800,
-  double variation = 25.0,
-  int year = 2025,
-  int month = 7,
-}) {
-  return MonthlyReport(
-    total: total,
-    previousTotal: previousTotal,
-    variation: variation,
-    categoryBreakdowns: const [],
-    year: year,
-    month: month,
-  );
-}
-
-/// Wait for build()'s Future.microtask auto-load to settle.
-Future<void> _waitForLoad() async {
-  await Future<void>.delayed(Duration.zero);
-  await Future<void>.delayed(Duration.zero);
-}
-
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late MockReportRepository mockRepo;
   late ProviderContainer container;
   late int currentMonth;
@@ -65,14 +32,14 @@ void main() {
         month: any(named: 'month'),
       ),
     ).thenAnswer(
-      (_) async => Success(_makeReport(year: currentYear, month: currentMonth)),
+      (_) async => Success(makeReport(year: currentYear, month: currentMonth)),
     );
 
     container = ProviderContainer(
       overrides: [
         reportRepositoryProvider.overrideWithValue(mockRepo),
         authSessionControllerProvider.overrideWith(
-          _FakeAuthSessionController.new,
+          FakeAuthSessionController.new,
         ),
       ],
     );
@@ -90,7 +57,7 @@ void main() {
 
     test('build auto-loads report via microtask', () async {
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final state = container.read(reportControllerProvider);
       expect(state.value, isNotNull);
@@ -107,14 +74,14 @@ void main() {
       ).thenAnswer((_) async => const Error(ReportFailure('db error')));
 
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       expect(container.read(reportControllerProvider).hasError, isTrue);
     });
 
     test('previousMonth decrements month correctly', () async {
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
       expect(notifier.selectedMonth, currentMonth);
@@ -130,7 +97,7 @@ void main() {
         ),
       ).thenAnswer(
         (_) async =>
-            Success(_makeReport(month: expectedMonth, year: expectedYear)),
+            Success(makeReport(month: expectedMonth, year: expectedYear)),
       );
 
       await notifier.previousMonth();
@@ -140,7 +107,7 @@ void main() {
 
     test('previousMonth wraps from January to December', () async {
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
 
@@ -152,7 +119,7 @@ void main() {
           month: 1,
         ),
       ).thenAnswer(
-        (_) async => Success(_makeReport(month: 1, year: currentYear)),
+        (_) async => Success(makeReport(month: 1, year: currentYear)),
       );
 
       await notifier.loadReportForMonth(year: currentYear, month: 1);
@@ -167,7 +134,7 @@ void main() {
           month: 12,
         ),
       ).thenAnswer(
-        (_) async => Success(_makeReport(month: 12, year: currentYear - 1)),
+        (_) async => Success(makeReport(month: 12, year: currentYear - 1)),
       );
 
       await notifier.previousMonth();
@@ -177,7 +144,7 @@ void main() {
 
     test('nextMonth increments month correctly', () async {
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
 
@@ -192,7 +159,7 @@ void main() {
           month: targetMonth,
         ),
       ).thenAnswer(
-        (_) async => Success(_makeReport(month: targetMonth, year: targetYear)),
+        (_) async => Success(makeReport(month: targetMonth, year: targetYear)),
       );
 
       await notifier.loadReportForMonth(year: targetYear, month: targetMonth);
@@ -207,7 +174,7 @@ void main() {
         ),
       ).thenAnswer(
         (_) async =>
-            Success(_makeReport(month: currentMonth, year: currentYear)),
+            Success(makeReport(month: currentMonth, year: currentYear)),
       );
 
       await notifier.nextMonth();
@@ -216,7 +183,7 @@ void main() {
 
     test('nextMonth does not go beyond current month', () async {
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
 
@@ -229,7 +196,7 @@ void main() {
 
     test('canGoNext returns false when at current month', () async {
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
       expect(notifier.canGoNext, isFalse);
@@ -238,10 +205,10 @@ void main() {
     test('canGoNext returns true when not at current month', () async {
       when(
         () => mockRepo.getMonthlyReport(householdId: 1, year: 2024, month: 1),
-      ).thenAnswer((_) async => Success(_makeReport(month: 1, year: 2024)));
+      ).thenAnswer((_) async => Success(makeReport(month: 1, year: 2024)));
 
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
       await notifier.loadReportForMonth(year: 2024, month: 1);
@@ -252,10 +219,10 @@ void main() {
     test('loadReportForMonth updates selectedYear and selectedMonth', () async {
       when(
         () => mockRepo.getMonthlyReport(householdId: 1, year: 2024, month: 3),
-      ).thenAnswer((_) async => Success(_makeReport(month: 3, year: 2024)));
+      ).thenAnswer((_) async => Success(makeReport(month: 3, year: 2024)));
 
       container.read(reportControllerProvider);
-      await _waitForLoad();
+      await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
       await notifier.loadReportForMonth(year: 2024, month: 3);

@@ -89,7 +89,7 @@ class ReportContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final amountFormat = NumberFormat.currency(
       locale: 'es_AR',
-      symbol: r'$',
+      symbol: '',
       decimalDigits: 0,
     );
 
@@ -185,6 +185,7 @@ class SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isIncrease = variation > 0;
     final variationColor = isIncrease ? Colors.red : Colors.green;
+    final formattedTotal = '\$${amountFormat.format(total)}'.trim();
 
     return Card(
       child: Padding(
@@ -199,7 +200,7 @@ class SummaryCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              amountFormat.format(total),
+              formattedTotal,
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.primary,

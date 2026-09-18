@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:biyuya/src/core/data/widget_category_sync.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/provider/category_repository_provider.dart';
@@ -14,14 +13,6 @@ class CategoryController extends _$CategoryController {
   AsyncValue<List<Category>> build() {
     unawaited(Future.microtask(_loadCategories));
     return const AsyncData([]);
-  }
-
-  // ponytail: fire-and-forget sync — widget handles empty state on failure
-  void _syncToWidget() {
-    final categories = state.value;
-    if (categories != null) {
-      unawaited(WidgetCategorySync.syncCategories(categories));
-    }
   }
 
   Future<void> _loadCategories() async {
@@ -40,7 +31,6 @@ class CategoryController extends _$CategoryController {
     );
     result.when((categories) {
       state = AsyncData(categories);
-      _syncToWidget();
     }, (failure) => state = AsyncError(failure, StackTrace.current));
   }
 
@@ -73,7 +63,6 @@ class CategoryController extends _$CategoryController {
     return result.when(
       (category) {
         state = AsyncData([...previous, category]);
-        _syncToWidget();
         return true;
       },
       (failure) {
@@ -109,7 +98,6 @@ class CategoryController extends _$CategoryController {
         if (index != -1) {
           previous[index] = updated;
           state = AsyncData(List.from(previous));
-          _syncToWidget();
         }
         return true;
       },
@@ -151,7 +139,6 @@ class CategoryController extends _$CategoryController {
     return result.when(
       (_) {
         state = AsyncData(previous.where((c) => c.id != id).toList());
-        _syncToWidget();
         return true;
       },
       (failure) {

@@ -1,8 +1,9 @@
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/views/category_form_view.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+
+import '../../../../helpers/test_helpers.dart';
 
 final _testCategory = Category(
   id: 42,
@@ -13,18 +14,12 @@ final _testCategory = Category(
   icon: '63046',
 );
 
-Widget wrap(Widget child) {
-  return ProviderScope(
-    child: MaterialApp(home: Scaffold(body: child)),
-  );
-}
-
 void main() {
   group('CategoryFormView', () {
     testWidgets('renders create mode with correct title and button', (
       tester,
     ) async {
-      await tester.pumpWidget(wrap(const CategoryFormView()));
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
       await tester.pumpAndSettle();
 
       expect(find.text('Nueva categoría'), findsOneWidget);
@@ -35,7 +30,9 @@ void main() {
     testWidgets('renders edit mode with correct title and button', (
       tester,
     ) async {
-      await tester.pumpWidget(wrap(CategoryFormView(category: _testCategory)));
+      await tester.pumpWidget(
+        wrapTest(child: CategoryFormView(category: _testCategory)),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Editar categoría'), findsOneWidget);
@@ -43,7 +40,9 @@ void main() {
     });
 
     testWidgets('pre-fills name in edit mode', (tester) async {
-      await tester.pumpWidget(wrap(CategoryFormView(category: _testCategory)));
+      await tester.pumpWidget(
+        wrapTest(child: CategoryFormView(category: _testCategory)),
+      );
       await tester.pumpAndSettle();
 
       final field = tester.widget<TextFormField>(find.byType(TextFormField));
@@ -51,7 +50,7 @@ void main() {
     });
 
     testWidgets('shows validation error for empty name', (tester) async {
-      await tester.pumpWidget(wrap(const CategoryFormView()));
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Crear'));
@@ -64,7 +63,7 @@ void main() {
     testWidgets('shows validation error for name shorter than 2 chars', (
       tester,
     ) async {
-      await tester.pumpWidget(wrap(const CategoryFormView()));
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField), 'A');
@@ -79,7 +78,7 @@ void main() {
     });
 
     testWidgets('shows color picker section', (tester) async {
-      await tester.pumpWidget(wrap(const CategoryFormView()));
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
       await tester.pumpAndSettle();
 
       expect(find.text('Color'), findsOneWidget);
@@ -87,7 +86,7 @@ void main() {
     });
 
     testWidgets('shows icon picker grid', (tester) async {
-      await tester.pumpWidget(wrap(const CategoryFormView()));
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
       await tester.pumpAndSettle();
 
       expect(find.text('Ícono'), findsOneWidget);
@@ -95,7 +94,7 @@ void main() {
     });
 
     testWidgets('no validation error with valid name', (tester) async {
-      await tester.pumpWidget(wrap(const CategoryFormView()));
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField), 'Groceries');

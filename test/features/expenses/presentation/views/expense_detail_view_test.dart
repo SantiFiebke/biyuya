@@ -14,6 +14,7 @@ final _testExpense = Expense(
   householdId: 1,
   categoryId: 2,
   userUuid: 'user-1',
+  userName: 'Test User',
   createdAt: DateTime(2025, 6, 15),
 );
 
@@ -80,12 +81,12 @@ void main() {
       expect(find.text('15/06/2025'), findsOneWidget);
     });
 
-    testWidgets('displays user uuid', (tester) async {
+    testWidgets('displays user name', (tester) async {
       await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
       await tester.pumpAndSettle();
 
       expect(find.text('Registrado por'), findsOneWidget);
-      expect(find.text('user-1'), findsOneWidget);
+      expect(find.text('Test User'), findsOneWidget);
     });
 
     testWidgets('edit button exists in app bar', (tester) async {

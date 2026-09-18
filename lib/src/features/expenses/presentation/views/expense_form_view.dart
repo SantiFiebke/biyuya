@@ -1,4 +1,3 @@
-import 'package:biyuya/src/core/models/expense_deep_link_params.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
@@ -11,10 +10,9 @@ import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ExpenseFormView extends ConsumerStatefulWidget {
-  const ExpenseFormView({super.key, this.expense, this.deepLinkParams});
+  const ExpenseFormView({super.key, this.expense});
 
   final Expense? expense;
-  final ExpenseDeepLinkParams? deepLinkParams;
 
   @override
   ConsumerState<ExpenseFormView> createState() => _ExpenseFormViewState();
@@ -29,33 +27,21 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
 
   bool get isEditing => widget.expense != null;
 
-  bool get _isAutoSubmitMode =>
-      widget.deepLinkParams?.autoSubmit == true &&
-      widget.deepLinkParams?.amount != null;
-
   bool get _saving => ref.watch(expenseControllerProvider).isLoading;
 
   @override
   void initState() {
     super.initState();
     final expense = widget.expense;
-    final deepLink = widget.deepLinkParams;
 
     _amountController = TextEditingController(
-      text:
-          expense?.amount.toStringAsFixed(2) ??
-          deepLink?.amount?.toStringAsFixed(2) ??
-          '',
+      text: expense?.amount.toStringAsFixed(2) ?? '',
     );
     _descriptionController = TextEditingController(
       text: expense?.description ?? '',
     );
-    _selectedCategoryId = expense?.categoryId ?? deepLink?.categoryId;
+    _selectedCategoryId = expense?.categoryId;
     _selectedDate = expense?.date ?? DateTime.now();
-
-    if (_isAutoSubmitMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _autoSubmit());
-    }
   }
 
   @override
@@ -119,59 +105,11 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
     }
   }
 
-  Future<void> _autoSubmit() async {
-    if (!mounted) {
-      return;
-    }
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    if (_selectedCategoryId == null) {
-      context.showErrorSnackBar('Elegí una categoría');
-      return;
-    }
-
-    final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount <= 0) {
-      context.showErrorSnackBar('Ingresá un monto válido');
-      return;
-    }
-
-    final description = _descriptionController.text.trim();
-    final success = await ref
-        .read(expenseControllerProvider.notifier)
-        .submitExpense(
-          amount: amount,
-          description: description.isEmpty ? null : description,
-          categoryId: _selectedCategoryId!,
-          date: _selectedDate,
-          expenseId: widget.expense?.id,
-        );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (success) {
-      context
-        ..showSuccessSnackBar('Gasto registrado')
-        ..go(AppRoute.home.path);
-    } else {
-      context.showErrorSnackBar('Error al registrar el gasto');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _isAutoSubmitMode && _saving
-              ? 'Registrando gasto...'
-              : isEditing
-              ? 'Editar gasto'
-              : 'Nuevo gasto',
-        ),
+        title: Text(isEditing ? 'Editar gasto' : 'Nuevo gasto'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go(AppRoute.home.path),
@@ -256,20 +194,15 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                   ),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: _saving ? null : () => context.go(AppRoute.home.path),
+                    onPressed: _saving
+                        ? null
+                        : () => context.go(AppRoute.home.path),
                     child: const Text('Cancelar'),
                   ),
                 ],
               ),
             ),
           ),
-          if (_isAutoSubmitMode && _saving)
-            const Positioned.fill(
-              child: ColoredBox(
-                color: Colors.black26,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
         ],
       ),
     );

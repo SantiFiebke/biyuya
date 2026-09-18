@@ -1,4 +1,3 @@
-import 'package:biyuya/src/core/models/expense_deep_link_params.dart';
 import 'package:biyuya/src/core/presentation/pages/splash_page.dart';
 import 'package:biyuya/src/features/auth/presentation/presentation.dart';
 import 'package:biyuya/src/features/categories/categories.dart';
@@ -13,23 +12,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'router_provider.g.dart';
-
-/// Holds pending deep link params from the native expense widget.
-/// Consumed once by the `/expenses/new` route builder.
-@Riverpod(keepAlive: true)
-class PendingDeepLink extends _$PendingDeepLink {
-  @override
-  ExpenseDeepLinkParams? build() => null;
-
-  // ignore: avoid_setters_without_getters -- setter exposes notifier state; getter is implicit via generated provider
-  set params(ExpenseDeepLinkParams? value) {
-    state = value;
-  }
-
-  void clear() {
-    state = null;
-  }
-}
 
 /// Notifier que retransmite los cambios del AuthSessionController a GoRouter
 class RouterRefreshNotifier extends ChangeNotifier {
@@ -88,17 +70,7 @@ GoRouter router(Ref ref) {
       GoRoute(
         path: AppRoute.expenseNew.path,
         builder: (context, state) {
-          // Check state.extra first (warm-start deep link), then pending provider (cold-start redirect)
-          final deepLinkParams =
-              state.extra as ExpenseDeepLinkParams? ??
-              ref.read(pendingDeepLinkProvider);
-          // Clear provider after consuming
-          if (ref.read(pendingDeepLinkProvider) != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              ref.read(pendingDeepLinkProvider.notifier).clear();
-            });
-          }
-          return ExpenseFormView(deepLinkParams: deepLinkParams);
+          return const ExpenseFormView();
         },
       ),
       GoRoute(
@@ -163,11 +135,6 @@ GoRouter router(Ref ref) {
               isVerifyingEmail ||
               loc == AppRoute.splash.path ||
               loc == AppRoute.onboarding.path) {
-            // Deep link from expense widget: route to new expense form
-            final pendingParams = ref.read(pendingDeepLinkProvider);
-            if (pendingParams != null) {
-              return AppRoute.expenseNew.path;
-            }
             return AppRoute.home.path;
           }
 

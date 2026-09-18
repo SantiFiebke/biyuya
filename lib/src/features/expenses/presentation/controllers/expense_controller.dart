@@ -32,10 +32,10 @@ class ExpenseController extends _$ExpenseController {
     final result = await repository.getExpenses(
       householdId: int.parse(householdId),
     );
-    result.when((expenses) {
-      state = AsyncData(expenses);
-      _syncDailyTotal(expenses);
-    }, (failure) => state = AsyncError(failure, StackTrace.current));
+    result.when(
+      _emitExpenses,
+      (failure) => state = AsyncError(failure, StackTrace.current),
+    );
   }
 
   Future<void> loadExpensesByMonth({
@@ -57,17 +57,19 @@ class ExpenseController extends _$ExpenseController {
       year: year,
       month: month,
     );
-    result.when((expenses) {
-      state = AsyncData(expenses);
-      _syncDailyTotal(expenses);
-    }, (failure) => state = AsyncError(failure, StackTrace.current));
+    result.when(
+      _emitExpenses,
+      (failure) => state = AsyncError(failure, StackTrace.current),
+    );
   }
 
   String? get _userUuid {
     return ref.read(supabaseClientProvider).auth.currentUser?.id;
   }
 
-  void _syncDailyTotal(List<Expense> expenses) {
+  /// Single exit point: sets expenses state and syncs widget total.
+  void _emitExpenses(List<Expense> expenses) {
+    state = AsyncData(expenses);
     final now = DateTime.now();
     final todayTotal = expenses
         .where(
@@ -76,7 +78,7 @@ class ExpenseController extends _$ExpenseController {
               e.date.month == now.month &&
               e.date.day == now.day,
         )
-        .fold<double>(0.0, (sum, e) => sum + e.amount);
+        .fold<double>(0, (sum, e) => sum + e.amount);
     unawaited(WidgetDailyTotalSync.syncTotal(todayTotal));
   }
 
@@ -94,7 +96,7 @@ class ExpenseController extends _$ExpenseController {
       return false;
     }
 
-    final List<Expense> previous = state.value ?? [];
+    final previous = state.value ?? [];
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.createExpense(
@@ -109,8 +111,7 @@ class ExpenseController extends _$ExpenseController {
     return await result.when(
       (expense) {
         final updated = [expense, ...previous];
-        state = AsyncData(updated);
-        _syncDailyTotal(updated);
+        _emitExpenses(updated);
         ref.invalidate(reportControllerProvider);
         return true;
       },
@@ -128,7 +129,7 @@ class ExpenseController extends _$ExpenseController {
     required int categoryId,
     String? description,
   }) async {
-    final List<Expense> previous = state.value ?? [];
+    final previous = state.value ?? [];
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.updateExpense(
@@ -146,8 +147,7 @@ class ExpenseController extends _$ExpenseController {
           previous[index] = updated;
         }
         final updatedList = List<Expense>.from(previous);
-        state = AsyncData(updatedList);
-        _syncDailyTotal(updatedList);
+        _emitExpenses(updatedList);
         ref.invalidate(reportControllerProvider);
         return true;
       },
@@ -185,7 +185,7 @@ class ExpenseController extends _$ExpenseController {
   }
 
   Future<bool> deleteExpense({required int id}) async {
-    final List<Expense> previous = state.value ?? [];
+    final previous = state.value ?? [];
 
     state = const AsyncLoading();
 
@@ -196,8 +196,7 @@ class ExpenseController extends _$ExpenseController {
     return await result.when(
       (_) {
         final remaining = previous.where((e) => e.id != id).toList();
-        state = AsyncData(remaining);
-        _syncDailyTotal(remaining);
+        _emitExpenses(remaining);
         ref.invalidate(reportControllerProvider);
         return true;
       },

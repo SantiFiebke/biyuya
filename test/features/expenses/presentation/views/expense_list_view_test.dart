@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../helpers/test_helpers.dart';
+
 final _testCategories = [
   Category(
     id: 1,
@@ -49,31 +51,41 @@ final _testExpenses = [
   ),
 ];
 
-Widget wrap(Widget child, {List<Expense>? expenses}) {
-  return ProviderScope(
-    overrides: [
-      categoryControllerProvider.overrideWithValue(
-        AsyncData<List<Category>>(_testCategories),
-      ),
-      expenseControllerProvider.overrideWithValue(
-        AsyncData<List<Expense>>(expenses ?? _testExpenses),
-      ),
-    ],
-    child: MaterialApp(home: child),
-  );
-}
-
 void main() {
   group('ExpenseListView', () {
     testWidgets('shows app bar with title', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseListView()));
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(_testExpenses),
+            ),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Gastos'), findsOneWidget);
     });
 
     testWidgets('displays category filter chip', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseListView()));
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(_testExpenses),
+            ),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(FilterChip), findsNWidgets(2));
@@ -82,7 +94,19 @@ void main() {
     });
 
     testWidgets('tapping category filter opens BottomSheet', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseListView()));
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(_testExpenses),
+            ),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Tap category filter chip
@@ -96,7 +120,19 @@ void main() {
     });
 
     testWidgets('tapping date filter opens date range picker', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseListView()));
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(_testExpenses),
+            ),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Tap date filter chip
@@ -108,7 +144,19 @@ void main() {
     });
 
     testWidgets('shows expense items in list', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseListView()));
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(_testExpenses),
+            ),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Groceries'), findsOneWidget);
@@ -116,7 +164,19 @@ void main() {
     });
 
     testWidgets('shows empty state when no expenses', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseListView(), expenses: []));
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              const AsyncData<List<Expense>>([]),
+            ),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(EmptyExpenses), findsOneWidget);
@@ -124,7 +184,19 @@ void main() {
     });
 
     testWidgets('shows FAB for creating new expense', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseListView()));
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(_testExpenses),
+            ),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(FloatingActionButton), findsOneWidget);

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:biyuya/src/core/models/expense_deep_link_params.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
@@ -10,6 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart' show Override;
+
+import '../../../../helpers/test_helpers.dart';
 
 final _testExpense = Expense(
   id: 42,
@@ -38,6 +40,15 @@ final _testCategories = [
     createdAt: DateTime(2025),
     color: '#2196F3',
     icon: '57681',
+  ),
+];
+
+List<Override> _baseOverrides() => [
+  categoryControllerProvider.overrideWithValue(
+    AsyncData<List<Category>>(_testCategories),
+  ),
+  expenseControllerProvider.overrideWithValue(
+    const AsyncData<List<Expense>>([]),
   ),
 ];
 
@@ -95,8 +106,8 @@ class _LoadingExpenseController extends ExpenseController {
   void release() => _hold.complete();
 }
 
-/// Shared controller instance so tests can call [release].
-_LoadingExpenseController? _loadingCtrl;
+// Shared controller instance so tests can call release.
+late _LoadingExpenseController? _loadingCtrl;
 
 /// GoRouter with a /test route that renders the passed-in [child],
 /// and a /home route for navigation assertions.
@@ -110,21 +121,6 @@ GoRouter _makeTestRouter(Widget child) => GoRouter(
     ),
   ],
 );
-
-/// Wrapper for tests that do NOT trigger auto-submit.
-Widget wrap(Widget child) {
-  return ProviderScope(
-    overrides: [
-      categoryControllerProvider.overrideWithValue(
-        AsyncData<List<Category>>(_testCategories),
-      ),
-      expenseControllerProvider.overrideWithValue(
-        const AsyncData<List<Expense>>([]),
-      ),
-    ],
-    child: MaterialApp(home: Scaffold(body: child)),
-  );
-}
 
 /// Wrapper with a failing fake: auto-submit runs but fails, form stays.
 Widget wrapWithFailing(Widget child) {
@@ -171,7 +167,9 @@ void main() {
     testWidgets('renders create mode with correct title and button', (
       tester,
     ) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Nuevo gasto'), findsOneWidget);
@@ -180,7 +178,12 @@ void main() {
     });
 
     testWidgets('renders edit mode with correct title', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseFormView(expense: _testExpense)));
+      await tester.pumpWidget(
+        wrapTest(
+          child: ExpenseFormView(expense: _testExpense),
+          overrides: _baseOverrides(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Editar gasto'), findsOneWidget);
@@ -188,7 +191,12 @@ void main() {
     });
 
     testWidgets('pre-fills amount in edit mode', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseFormView(expense: _testExpense)));
+      await tester.pumpWidget(
+        wrapTest(
+          child: ExpenseFormView(expense: _testExpense),
+          overrides: _baseOverrides(),
+        ),
+      );
       await tester.pumpAndSettle();
 
       final amountField = tester.widget<TextFormField>(
@@ -198,7 +206,9 @@ void main() {
     });
 
     testWidgets('shows validation error for empty amount', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Guardar'));
@@ -209,7 +219,9 @@ void main() {
     });
 
     testWidgets('shows category dropdown', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(DropdownButtonFormField<int>), findsOneWidget);
@@ -217,7 +229,9 @@ void main() {
     });
 
     testWidgets('shows date picker field', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Fecha'), findsOneWidget);
@@ -225,7 +239,9 @@ void main() {
     });
 
     testWidgets('shows amount field with dollar prefix', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Monto'), findsOneWidget);
@@ -233,7 +249,9 @@ void main() {
     });
 
     testWidgets('shows description field', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Descripción (opcional)'), findsOneWidget);
@@ -242,7 +260,9 @@ void main() {
     testWidgets('dropdown contains "Crear nueva categoría" option', (
       tester,
     ) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(DropdownButtonFormField<int>));
@@ -255,7 +275,9 @@ void main() {
     testWidgets('tapping "Crear nueva categoría" opens BottomSheet', (
       tester,
     ) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(DropdownButtonFormField<int>));
@@ -267,7 +289,9 @@ void main() {
     });
 
     testWidgets('BottomSheet has name input and color picker', (tester) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(DropdownButtonFormField<int>));
@@ -286,107 +310,8 @@ void main() {
     testWidgets('renders normally when no deep link params provided', (
       tester,
     ) async {
-      await tester.pumpWidget(wrap(const ExpenseFormView()));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Nuevo gasto'), findsOneWidget);
-      expect(find.byIcon(Icons.home), findsNothing);
-    });
-
-    testWidgets('pre-fills amount from deep link params', (tester) async {
-      final params = ExpenseDeepLinkParams.fromUri(
-        Uri.parse('biyuya://expense/new?amount=250.00&category_id=2'),
-      );
-
       await tester.pumpWidget(
-        wrapWithFailing(ExpenseFormView(deepLinkParams: params)),
-      );
-      await tester.pumpAndSettle();
-
-      final amountField = tester.widget<TextFormField>(
-        find.byType(TextFormField).first,
-      );
-      expect(amountField.controller?.text, '250.00');
-    });
-
-    testWidgets('shows home icon button in auto-submit mode', (tester) async {
-      final params = ExpenseDeepLinkParams.fromUri(
-        Uri.parse('biyuya://expense/new?amount=50&category_id=1'),
-      );
-
-      await tester.pumpWidget(
-        wrapWithFailing(ExpenseFormView(deepLinkParams: params)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byIcon(Icons.home), findsOneWidget);
-    });
-
-    testWidgets('navigates to /home on successful auto-submit', (tester) async {
-      final params = ExpenseDeepLinkParams.fromUri(
-        Uri.parse('biyuya://expense/new?amount=50&category_id=1'),
-      );
-
-      await tester.pumpWidget(
-        wrapWithSuccess(ExpenseFormView(deepLinkParams: params)),
-      );
-      await tester.pumpAndSettle();
-
-      // Auto-submit succeeded → navigated to /home
-      expect(find.text('Home'), findsOneWidget);
-    });
-
-    testWidgets('shows loading overlay during auto-submit', (tester) async {
-      final params = ExpenseDeepLinkParams.fromUri(
-        Uri.parse('biyuya://expense/new?amount=50&category_id=1'),
-      );
-
-      await tester.pumpWidget(
-        wrapWithLoading(ExpenseFormView(deepLinkParams: params)),
-      );
-      // Let postFrameCallback fire → _autoSubmit runs → sets AsyncLoading
-      await tester.pump();
-      await tester.pump();
-
-      // Loading overlay should be visible
-      expect(
-        find.byWidgetPredicate(
-          (w) => w is ColoredBox && w.color == Colors.black26,
-        ),
-        findsOneWidget,
-      );
-
-      _loadingCtrl!.release();
-      await tester.pumpAndSettle();
-    });
-
-    testWidgets('shows "Registrando gasto..." title during auto-submit', (
-      tester,
-    ) async {
-      final params = ExpenseDeepLinkParams.fromUri(
-        Uri.parse('biyuya://expense/new?amount=50&category_id=1'),
-      );
-
-      await tester.pumpWidget(
-        wrapWithLoading(ExpenseFormView(deepLinkParams: params)),
-      );
-      // Let postFrameCallback fire → _autoSubmit runs → sets AsyncLoading
-      await tester.pump();
-      await tester.pump();
-
-      expect(find.text('Registrando gasto...'), findsOneWidget);
-
-      _loadingCtrl!.release();
-      await tester.pumpAndSettle();
-    });
-
-    testWidgets('does not trigger auto-submit when hasData is false', (
-      tester,
-    ) async {
-      const params = ExpenseDeepLinkParams();
-
-      await tester.pumpWidget(
-        wrap(const ExpenseFormView(deepLinkParams: params)),
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
       );
       await tester.pumpAndSettle();
 
