@@ -53,3 +53,7 @@ requirements.md
 .serena/
 users_feedback.txt
 supabase/.temp/
+
+# Backup dumps
+backups/
+scripts/

@@ -1,11 +1,14 @@
+import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/dialogs/confirm_action_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
+import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/category_filter_sheet.dart';
+import 'package:biyuya/src/features/expenses/presentation/widgets/member_filter_sheet.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,14 +26,18 @@ class ExpenseListView extends ConsumerStatefulWidget {
 class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
   int? _selectedCategoryId;
   DateTimeRange? _dateRange;
+  String? _selectedUserUuid;
 
   bool get _hasActiveFilters =>
-      _selectedCategoryId != null || _dateRange != null;
+      _selectedCategoryId != null ||
+      _dateRange != null ||
+      _selectedUserUuid != null;
 
   void _clearFilters() {
     setState(() {
       _selectedCategoryId = null;
       _dateRange = null;
+      _selectedUserUuid = null;
     });
   }
 
@@ -53,6 +60,18 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     }
   }
 
+  Future<void> _showMemberFilter(
+    BuildContext context,
+    List<UserProfile> members,
+  ) async {
+    final result = await showMemberFilterSheet(
+      context,
+      members: members,
+      selectedUuid: _selectedUserUuid,
+    );
+    setState(() => _selectedUserUuid = result);
+  }
+
   List<Expense> _filterExpenses(List<Expense> expenses) {
     var filtered = expenses;
 
@@ -72,12 +91,20 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
           .toList();
     }
 
+    if (_selectedUserUuid != null) {
+      filtered = filtered
+          .where((e) => e.userUuid == _selectedUserUuid)
+          .toList();
+    }
+
     return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
     final asyncExpenses = ref.watch(expenseControllerProvider);
+    final asyncMembers = ref.watch(householdMembersProvider);
+    final members = asyncMembers.value ?? [];
 
     ref.listen<AsyncValue<List<Expense>>>(expenseControllerProvider, (
       _,
@@ -89,6 +116,23 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
         },
       );
     });
+
+    // Safety reset: orphaned user filter
+    ref.listen<AsyncValue<List<UserProfile>>>(householdMembersProvider, (
+      _,
+      state,
+    ) {
+      final currentMembers = state.value ?? [];
+      final selectedExists =
+          _selectedUserUuid != null &&
+          currentMembers.any((m) => m.id == _selectedUserUuid);
+      if (_selectedUserUuid != null &&
+          (!selectedExists || currentMembers.length <= 1)) {
+        setState(() => _selectedUserUuid = null);
+      }
+    });
+
+    final showMemberChip = asyncMembers.hasValue && members.length > 1;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Gastos')),
@@ -110,6 +154,20 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
                   selected: _dateRange != null,
                   onSelected: (_) => _showDateRangePicker(),
                 ),
+                if (showMemberChip) ...[
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: Text(
+                      _selectedUserUuid != null
+                          ? members
+                                .firstWhere((m) => m.id == _selectedUserUuid)
+                                .name
+                          : 'Usuario',
+                    ),
+                    selected: _selectedUserUuid != null,
+                    onSelected: (_) => _showMemberFilter(context, members),
+                  ),
+                ],
                 if (_hasActiveFilters)
                   TextButton(
                     onPressed: _clearFilters,

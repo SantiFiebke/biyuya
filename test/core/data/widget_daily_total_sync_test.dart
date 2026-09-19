@@ -14,9 +14,9 @@ void main() {
     log.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (methodCall) async {
-      log.add(methodCall);
-      return null;
-    });
+          log.add(methodCall);
+          return null;
+        });
   });
 
   tearDown(() {
@@ -75,32 +75,38 @@ void main() {
   });
 
   group('missing platform handler', () {
-    test('syncTotal persists keys even when channel throws MissingPluginException', () async {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null);
+    test(
+      'syncTotal persists keys even when channel throws MissingPluginException',
+      () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
 
-      // No handler → MissingPluginException. Should not throw.
-      await WidgetDailyTotalSync.syncTotal(99.99);
+        // No handler → MissingPluginException. Should not throw.
+        await WidgetDailyTotalSync.syncTotal(99.99);
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('widget_daily_total'), '99.99');
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('widget_daily_total'), '99.99');
 
-      final today = DateTime.now().toIso8601String().substring(0, 10);
-      expect(prefs.getString('widget_daily_date'), today);
-    });
+        final today = DateTime.now().toIso8601String().substring(0, 10);
+        expect(prefs.getString('widget_daily_date'), today);
+      },
+    );
 
-    test('clearTotal removes keys even when channel throws MissingPluginException', () async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('widget_daily_total', '50');
-      await prefs.setString('widget_daily_date', '2026-06-01');
+    test(
+      'clearTotal removes keys even when channel throws MissingPluginException',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('widget_daily_total', '50');
+        await prefs.setString('widget_daily_date', '2026-06-01');
 
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null);
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
 
-      await WidgetDailyTotalSync.clearTotal();
+        await WidgetDailyTotalSync.clearTotal();
 
-      expect(prefs.getString('widget_daily_total'), isNull);
-      expect(prefs.getString('widget_daily_date'), isNull);
-    });
+        expect(prefs.getString('widget_daily_total'), isNull);
+        expect(prefs.getString('widget_daily_date'), isNull);
+      },
+    );
   });
 }

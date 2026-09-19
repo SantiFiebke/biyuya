@@ -5,6 +5,7 @@ import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household.dart';
 import 'package:biyuya/src/features/auth/domain/models/household_model.dart';
 import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
+import 'package:biyuya/src/features/categories/data/default_categories.dart';
 import 'package:multiple_result/multiple_result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
@@ -115,24 +116,16 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   @override
   Future<Result<Household, AuthFailure>> createHousehold({
     required String householdName,
-    required String userId,
   }) async {
     try {
-      final householdData = await _client
-          .from('households')
-          .insert({'name': householdName})
-          .select()
-          .single();
-
-      final household = HouseholdModel.fromJson(householdData);
-
-      // Link user to household directly by ID (just created)
-      await _client
-          .from('profiles')
-          .update({'household_id': household.id})
-          .eq('id', userId);
-
-      return Success(household);
+      final data = await _client.rpc<Map<String, dynamic>>(
+        'create_household',
+        params: <String, dynamic>{
+          'p_name': householdName,
+          'p_categories': defaultCategories.map((c) => c.toJson()).toList(),
+        },
+      );
+      return Success(HouseholdModel.fromJson(data));
     } on Exception catch (e) {
       return Error(AuthFailure('Error al crear el hogar: $e'));
     }
@@ -166,6 +159,24 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
       return Success(UserProfileModel.fromJson(updatedData));
     } on Exception catch (e) {
       return Error(AuthFailure('Error al unirse al hogar: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<UserProfile>, AuthFailure>> getHouseholdMembers({
+    required int householdId,
+  }) async {
+    try {
+      final data = await _client
+          .from('profiles')
+          .select('id, name, last_name, household_id')
+          .eq('household_id', householdId)
+          .order('name');
+
+      final members = data.map(UserProfileModel.fromJson).toList();
+      return Success(members);
+    } on Exception catch (e) {
+      return Error(AuthFailure('Error al obtener miembros del hogar: $e'));
     }
   }
 
