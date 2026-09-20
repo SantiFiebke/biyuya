@@ -5,6 +5,7 @@ import 'package:biyuya/src/features/expenses/expenses.dart';
 import 'package:biyuya/src/features/home/home.dart';
 import 'package:biyuya/src/features/profile/profile.dart';
 import 'package:biyuya/src/features/reports/reports.dart';
+import 'package:biyuya/src/navigation/presentation/main_shell.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:go_router/go_router.dart';
@@ -28,6 +29,7 @@ GoRouter router(Ref ref) {
     initialLocation: AppRoute.splash.path,
     refreshListenable: refreshNotifier,
     routes: [
+      // ── Top-level routes (fuera del shell) ──
       GoRoute(
         path: AppRoute.splash.path,
         builder: (context, state) => const SplashPage(),
@@ -45,10 +47,6 @@ GoRouter router(Ref ref) {
         builder: (context, state) => const OnboardingView(),
       ),
       GoRoute(
-        path: AppRoute.home.path,
-        builder: (context, state) => const HomeView(),
-      ),
-      GoRoute(
         path: AppRoute.categories.path,
         builder: (context, state) => const CategoryListView(),
       ),
@@ -63,42 +61,77 @@ GoRouter router(Ref ref) {
           return CategoryFormView(category: category);
         },
       ),
-      GoRoute(
-        path: AppRoute.expenses.path,
-        builder: (context, state) => const ExpenseListView(),
-      ),
-      GoRoute(
-        path: AppRoute.expenseNew.path,
-        builder: (context, state) {
-          return const ExpenseFormView();
-        },
-      ),
-      GoRoute(
-        path: '${AppRoute.expenses.path}/:id/edit',
-        builder: (context, state) {
-          final expense = state.extra as Expense?;
-          return ExpenseFormView(expense: expense);
-        },
-      ),
-      GoRoute(
-        path: '${AppRoute.expenses.path}/:id',
-        builder: (context, state) {
-          final expense = state.extra as Expense?;
-          if (expense == null) {
-            return const Scaffold(
-              body: Center(child: Text('Gasto no encontrado')),
-            );
-          }
-          return ExpenseDetailView(expense: expense);
-        },
-      ),
-      GoRoute(
-        path: AppRoute.reports.path,
-        builder: (context, state) => const ReportView(),
-      ),
-      GoRoute(
-        path: AppRoute.profile.path,
-        builder: (context, state) => const ProfileView(),
+
+      // ── Shell route con bottom navbar ──
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainShell(navigationShell: navigationShell),
+        branches: [
+          // Branch 0: Home
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoute.home.path,
+                builder: (context, state) => const HomeView(),
+              ),
+            ],
+          ),
+
+          // Branch 1: Expenses (subrutas relativas)
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoute.expenses.path,
+                builder: (context, state) => const ExpenseListView(),
+                routes: [
+                  GoRoute(
+                    path: 'new',
+                    builder: (context, state) => const ExpenseFormView(),
+                  ),
+                  GoRoute(
+                    path: ':id/edit',
+                    builder: (context, state) {
+                      final expense = state.extra as Expense?;
+                      return ExpenseFormView(expense: expense);
+                    },
+                  ),
+                  GoRoute(
+                    path: ':id',
+                    builder: (context, state) {
+                      final expense = state.extra as Expense?;
+                      if (expense == null) {
+                        return const Scaffold(
+                          body: Center(child: Text('Gasto no encontrado')),
+                        );
+                      }
+                      return ExpenseDetailView(expense: expense);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // Branch 2: Reports
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoute.reports.path,
+                builder: (context, state) => const ReportView(),
+              ),
+            ],
+          ),
+
+          // Branch 3: Profile
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoute.profile.path,
+                builder: (context, state) => const ProfileView(),
+              ),
+            ],
+          ),
+        ],
       ),
     ],
     redirect: (context, state) {

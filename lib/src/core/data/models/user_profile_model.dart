@@ -6,6 +6,7 @@ class UserProfileModel extends UserProfile {
     required super.name,
     required super.lastName,
     super.householdId,
+    super.role,
   });
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
@@ -16,6 +17,7 @@ class UserProfileModel extends UserProfile {
       householdId: json['household_id'] != null
           ? (json['household_id'] as num).toString()
           : null,
+      role: json['role'] as String? ?? 'member',
     );
   }
 
@@ -25,6 +27,7 @@ class UserProfileModel extends UserProfile {
       'name': name,
       'last_name': lastName,
       'household_id': householdId,
+      'role': role,
     };
   }
 
@@ -33,12 +36,14 @@ class UserProfileModel extends UserProfile {
     String? name,
     String? lastName,
     String? householdId,
+    String? role,
   }) {
     return UserProfileModel(
       id: id ?? this.id,
       name: name ?? this.name,
       lastName: lastName ?? this.lastName,
       householdId: householdId ?? this.householdId,
+      role: role ?? this.role,
     );
   }
 }

@@ -334,17 +334,101 @@ class MaterialTheme {
     return theme(darkHighContrastScheme());
   }
 
-  ThemeData theme(ColorScheme colorScheme) => ThemeData(
-    useMaterial3: true,
-    brightness: colorScheme.brightness,
-    colorScheme: colorScheme,
-    textTheme: textTheme.apply(
-      bodyColor: colorScheme.onSurface,
-      displayColor: colorScheme.onSurface,
-    ),
-    scaffoldBackgroundColor: colorScheme.surface,
-    canvasColor: colorScheme.surface,
-  );
+  ThemeData theme(ColorScheme colorScheme) {
+    final isDark = colorScheme.brightness == Brightness.dark;
+    return ThemeData(
+      useMaterial3: true,
+      brightness: colorScheme.brightness,
+      colorScheme: colorScheme,
+      textTheme: textTheme.apply(
+        bodyColor: colorScheme.onSurface,
+        displayColor: colorScheme.onSurface,
+      ),
+      scaffoldBackgroundColor: isDark
+          ? const Color(0xFF101418)
+          : const Color(0xFFF8F9FA),
+      canvasColor: isDark ? const Color(0xFF101418) : const Color(0xFFF8F9FA),
+      appBarTheme: AppBarTheme(
+        backgroundColor: isDark
+            ? const Color(0xFF101418)
+            : const Color(0xFFF8F9FA),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: colorScheme.onSurface,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: isDark ? const Color(0xFF1A1F24) : Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 1,
+        shadowColor: Colors.black.withValues(alpha: 0.04),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1A1F24) : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide(color: colorScheme.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          borderSide: BorderSide(color: colorScheme.error),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: isDark ? const Color(0xFF1A1F24) : Colors.white,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: colorScheme.primaryContainer,
+        elevation: 0,
+        labelTextStyle: WidgetStatePropertyAll(
+          textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      extensions: [
+        AppColors(
+          income: isDark ? const Color(0xFF34D399) : const Color(0xFF00A86B),
+          expense: isDark ? const Color(0xFFF87171) : const Color(0xFFE53E3E),
+        ),
+      ],
+    );
+  }
 
   List<ExtendedColor> get extendedColors => [];
 }
@@ -382,4 +466,29 @@ class ColorFamily {
   final Color onColor;
   final Color colorContainer;
   final Color onColorContainer;
+}
+
+@immutable
+class AppColors extends ThemeExtension<AppColors> {
+  const AppColors({required this.income, required this.expense});
+
+  final Color income;
+  final Color expense;
+
+  @override
+  AppColors copyWith({Color? income, Color? expense}) => AppColors(
+    income: income ?? this.income,
+    expense: expense ?? this.expense,
+  );
+
+  @override
+  AppColors lerp(ThemeExtension<AppColors>? other, double t) {
+    if (other is! AppColors) {
+      return this;
+    }
+    return AppColors(
+      income: Color.lerp(income, other.income, t)!,
+      expense: Color.lerp(expense, other.expense, t)!,
+    );
+  }
 }

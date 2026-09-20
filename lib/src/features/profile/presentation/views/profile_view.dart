@@ -4,6 +4,7 @@ import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart'
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
+import 'package:biyuya/src/features/profile/presentation/widgets/delete_household_dialog.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,6 +59,8 @@ class ProfileContent extends StatelessWidget {
           _HouseholdInfoCard(householdName: householdName),
           const SizedBox(height: 16),
           const _MenuItems(),
+          const SizedBox(height: 16),
+          const _HouseholdActionsCard(),
           const SizedBox(height: 24),
           const _LogoutButton(),
         ],
@@ -170,14 +173,104 @@ class _MenuItems extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoute.categories.path),
           ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.bar_chart_outlined),
-            title: const Text('Reportes'),
-            subtitle: const Text('Ver reportes mensuales'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoute.reports.path),
-          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HouseholdActionsCard extends ConsumerWidget {
+  const _HouseholdActionsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userProfile = ref.watch(authSessionControllerProvider).asData?.value;
+    final isOwner = userProfile?.isOwner ?? false;
+    final hasHousehold = userProfile?.hasHousehold ?? false;
+
+    if (!hasHousehold) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      child: Column(
+        children: [
+          if (isOwner)
+            ListTile(
+              leading: Icon(
+                Icons.delete_forever_outlined,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: const Text('Eliminar hogar'),
+              subtitle: const Text('Eliminar hogar y todos sus datos'),
+              onTap: () async {
+                final name = ref
+                    .read(householdNameProvider)
+                    .asData
+                    ?.value
+                    ?.name;
+                if (name == null) {
+                  if (context.mounted) {
+                    context.showErrorSnackBar(
+                      'No se pudo obtener el nombre del hogar',
+                    );
+                  }
+                  return;
+                }
+
+                final confirmed = await showDeleteHouseholdDialog(
+                  context,
+                  householdName: name,
+                );
+                if (!confirmed || !context.mounted) {
+                  return;
+                }
+
+                final result = await ref
+                    .read(authSessionControllerProvider.notifier)
+                    .deleteHousehold();
+                if (!context.mounted) {
+                  return;
+                }
+                result.when(
+                  (_) => context.showSuccessSnackBar('Hogar eliminado'),
+                  (failure) => context.showErrorSnackBar(failure.message),
+                );
+              },
+            )
+          else
+            ListTile(
+              leading: Icon(
+                Icons.logout_outlined,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: const Text('Salir del hogar'),
+              subtitle: const Text('Tus gastos quedarán en el hogar'),
+              onTap: () async {
+                final confirmed = await showConfirmActionDialog(
+                  context: context,
+                  title: 'Salir del hogar',
+                  content:
+                      '¿Seguro que querés salir de este hogar? Tus gastos quedarán en el hogar.',
+                  confirmLabel: 'Salir',
+                  isDestructive: true,
+                );
+                if (!confirmed || !context.mounted) {
+                  return;
+                }
+
+                final result = await ref
+                    .read(authSessionControllerProvider.notifier)
+                    .leaveHousehold();
+                if (!context.mounted) {
+                  return;
+                }
+                result.when(
+                  (_) => context.showSuccessSnackBar('Saliste del hogar'),
+                  (failure) => context.showErrorSnackBar(failure.message),
+                );
+              },
+            ),
         ],
       ),
     );

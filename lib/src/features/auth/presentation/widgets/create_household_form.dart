@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:material_ui/material_ui.dart';
 
 class CreateHouseholdForm extends StatefulWidget {
@@ -45,16 +46,9 @@ class CreateHouseholdFormState extends State<CreateHouseholdForm> {
               prefixIcon: Icon(Icons.home_outlined),
             ),
             textCapitalization: TextCapitalization.words,
+            maxLength: FormValidators.householdNameMaxLength,
             enabled: !widget.isLoading,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Por favor, ingresa un nombre';
-              }
-              if (value.trim().length < 2) {
-                return 'El nombre debe tener al menos 2 caracteres';
-              }
-              return null;
-            },
+            validator: FormValidators.householdName,
           ),
           const SizedBox(height: 24),
           ElevatedButton(

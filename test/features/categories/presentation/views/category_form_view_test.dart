@@ -57,7 +57,7 @@ void main() {
       await tester.tap(find.text('Crear'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Por favor, ingresa un nombre'), findsOneWidget);
+      expect(find.text('Ingresá un nombre'), findsOneWidget);
     });
 
     testWidgets('shows validation error for name shorter than 2 chars', (
@@ -71,10 +71,7 @@ void main() {
       await tester.tap(find.text('Crear'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('El nombre debe tener al menos 2 caracteres'),
-        findsOneWidget,
-      );
+      expect(find.text('Mínimo 2 caracteres'), findsOneWidget);
     });
 
     testWidgets('shows color picker section', (tester) async {
@@ -100,11 +97,8 @@ void main() {
       await tester.enterText(find.byType(TextFormField), 'Groceries');
       await tester.pumpAndSettle();
 
-      expect(find.text('Por favor, ingresa un nombre'), findsNothing);
-      expect(
-        find.text('El nombre debe tener al menos 2 caracteres'),
-        findsNothing,
-      );
+      expect(find.text('Ingresá un nombre'), findsNothing);
+      expect(find.text('Mínimo 2 caracteres'), findsNothing);
     });
   });
 }

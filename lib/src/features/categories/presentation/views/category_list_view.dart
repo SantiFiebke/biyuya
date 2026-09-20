@@ -59,6 +59,7 @@ class CategoryListView extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: () => context.push(AppRoute.categoryNew.path),
         child: const Icon(Icons.add),
       ),

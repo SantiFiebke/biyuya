@@ -1,4 +1,5 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_form_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -97,13 +98,9 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     textCapitalization: TextCapitalization.words,
+                    maxLength: FormValidators.nameMaxLength,
                     enabled: !isLoading,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Por favor, ingresa tu nombre';
-                      }
-                      return null;
-                    },
+                    validator: FormValidators.name,
                   ),
                   const SizedBox(height: 16),
 
@@ -115,13 +112,9 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                       prefixIcon: Icon(Icons.badge_outlined),
                     ),
                     textCapitalization: TextCapitalization.words,
+                    maxLength: FormValidators.nameMaxLength,
                     enabled: !isLoading,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Por favor, ingresa tu apellido';
-                      }
-                      return null;
-                    },
+                    validator: FormValidators.name,
                   ),
                   const SizedBox(height: 16),
 
@@ -134,17 +127,7 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                     ),
                     keyboardType: TextInputType.emailAddress,
                     enabled: !isLoading,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, ingresa tu correo';
-                      }
-                      if (!RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(value)) {
-                        return 'Ingresa un correo válido';
-                      }
-                      return null;
-                    },
+                    validator: FormValidators.email,
                   ),
                   const SizedBox(height: 16),
 
@@ -165,15 +148,7 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                     ),
                     obscureText: !showPassword,
                     enabled: !isLoading,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, ingresa tu contraseña';
-                      }
-                      if (value.length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
-                      }
-                      return null;
-                    },
+                    validator: FormValidators.password,
                   ),
                   const SizedBox(height: 16),
 
@@ -194,15 +169,10 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                     ),
                     obscureText: !showPassword,
                     enabled: !isLoading,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, confirma tu contraseña';
-                      }
-                      if (value != _passwordController.text) {
-                        return 'Las contraseñas no coinciden';
-                      }
-                      return null;
-                    },
+                    validator: (v) => FormValidators.confirmPassword(
+                      v,
+                      _passwordController.text,
+                    ),
                   ),
                   const SizedBox(height: 28),
 

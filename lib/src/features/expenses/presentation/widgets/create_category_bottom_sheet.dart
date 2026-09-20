@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -25,6 +26,8 @@ Future<int?> showCreateCategorySheet(
   String? selectedColor;
   int? newCategoryId;
 
+  final formKey = GlobalKey<FormState>();
+
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -36,73 +39,78 @@ Future<int?> showCreateCategorySheet(
           right: 16,
           top: 16,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Nueva categoría',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Nombre',
-                border: OutlineInputBorder(),
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Nueva categoría',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              children: _presetColors.map((hex) {
-                final color = Color(
-                  int.parse('FF${hex.substring(1)}', radix: 16),
-                );
-                return GestureDetector(
-                  onTap: () => setSheetState(() => selectedColor = hex),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: selectedColor == hex
-                          ? Border.all(color: Colors.white, width: 3)
-                          : null,
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+                maxLength: FormValidators.categoryNameMaxLength,
+                validator: FormValidators.categoryName,
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                children: _presetColors.map((hex) {
+                  final color = Color(
+                    int.parse('FF${hex.substring(1)}', radix: 16),
+                  );
+                  return GestureDetector(
+                    onTap: () => setSheetState(() => selectedColor = hex),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: selectedColor == hex
+                            ? Border.all(color: Colors.white, width: 3)
+                            : null,
+                      ),
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  return;
-                }
-
-                final success = await ref
-                    .read(categoryControllerProvider.notifier)
-                    .createCategory(
-                      name: nameController.text.trim(),
-                      color: selectedColor,
-                    );
-
-                if (success && context.mounted) {
-                  Navigator.pop(context);
-                  final categories =
-                      ref.read(categoryControllerProvider).value ?? [];
-                  if (categories.isNotEmpty) {
-                    newCategoryId = categories.last.id;
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) {
+                    return;
                   }
-                }
-              },
-              child: const Text('Crear'),
-            ),
-            const SizedBox(height: 16),
-          ],
+
+                  final success = await ref
+                      .read(categoryControllerProvider.notifier)
+                      .createCategory(
+                        name: nameController.text.trim(),
+                        color: selectedColor,
+                      );
+
+                  if (success && context.mounted) {
+                    Navigator.pop(context);
+                    final categories =
+                        ref.read(categoryControllerProvider).value ?? [];
+                    if (categories.isNotEmpty) {
+                      newCategoryId = categories.last.id;
+                    }
+                  }
+                },
+                child: const Text('Crear'),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     ),

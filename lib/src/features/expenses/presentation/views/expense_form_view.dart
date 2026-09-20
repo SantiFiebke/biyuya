@@ -1,4 +1,5 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/category_dropdown.dart';
@@ -75,8 +76,8 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
       return;
     }
 
-    final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount <= 0) {
+    final amount = FormValidators.parseAmount(_amountController.text);
+    if (amount == null) {
       context.showErrorSnackBar('Ingresá un monto válido');
       return;
     }
@@ -134,17 +135,9 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    inputFormatters: const [DecimalTextInputFormatter()],
                     enabled: !_saving,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Ingresá un monto';
-                      }
-                      final parsed = double.tryParse(value);
-                      if (parsed == null || parsed <= 0) {
-                        return 'Monto inválido';
-                      }
-                      return null;
-                    },
+                    validator: FormValidators.amount,
                   ),
                   const SizedBox(height: 24),
                   CategoryDropdown(
@@ -178,8 +171,10 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                       prefixIcon: Icon(Icons.notes),
                     ),
                     maxLines: 3,
+                    maxLength: FormValidators.descriptionMaxLength,
                     textCapitalization: TextCapitalization.sentences,
                     enabled: !_saving,
+                    validator: FormValidators.description,
                   ),
                   const SizedBox(height: 32),
                   ElevatedButton(

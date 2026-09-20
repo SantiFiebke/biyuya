@@ -1,4 +1,5 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
+import 'package:biyuya/src/core/presentation/widgets/empty_state.dart';
 import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
@@ -184,8 +185,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(EmptyExpenses), findsOneWidget);
+      expect(find.byType(EmptyState), findsOneWidget);
       expect(find.text('No hay gastos'), findsOneWidget);
+      expect(find.text('Registrar gasto'), findsOneWidget);
     });
 
     testWidgets('shows FAB for creating new expense', (tester) async {
@@ -434,4 +436,125 @@ void main() {
       expect(find.text('Lunch'), findsOneWidget);
     });
   });
+
+  group('ExpenseTile actions menu', () {
+    List<Override> baseOverrides({
+      List<Expense>? expenses,
+      ExpenseController Function()? controller,
+    }) => [
+      categoryControllerProvider.overrideWithValue(
+        AsyncData<List<Category>>(_testCategories),
+      ),
+      if (controller != null)
+        expenseControllerProvider.overrideWith(controller)
+      else
+        expenseControllerProvider.overrideWithValue(
+          AsyncData<List<Expense>>(expenses ?? _testExpenses),
+        ),
+    ];
+
+    testWidgets('shows edit and delete menu items', (tester) async {
+      final fake = _RecordingExpenseController(_testExpenses);
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: baseOverrides(controller: () => fake),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Más opciones'), findsWidgets);
+      expect(find.byIcon(Icons.more_vert), findsWidgets);
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Editar'), findsOneWidget);
+      expect(find.text('Eliminar'), findsOneWidget);
+    });
+
+    testWidgets('tapping delete opens confirmation dialog', (tester) async {
+      final fake = _RecordingExpenseController(_testExpenses);
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: baseOverrides(controller: () => fake),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Eliminar gasto'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Eliminar'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Cancelar'), findsOneWidget);
+    });
+
+    testWidgets('confirming delete records id and removes expense', (
+      tester,
+    ) async {
+      final fake = _RecordingExpenseController(_testExpenses);
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: baseOverrides(controller: () => fake),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Groceries'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(fake.deletedIds, [1]);
+      expect(find.text('Groceries'), findsNothing);
+      expect(find.text('Bus ticket'), findsOneWidget);
+    });
+
+    testWidgets('cancelling delete records nothing', (tester) async {
+      final fake = _RecordingExpenseController(_testExpenses);
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: baseOverrides(controller: () => fake),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
+      await tester.pumpAndSettle();
+
+      expect(fake.deletedIds, isEmpty);
+      expect(find.text('Groceries'), findsOneWidget);
+    });
+  });
+}
+
+class _RecordingExpenseController extends ExpenseController {
+  _RecordingExpenseController(this._initial);
+
+  final List<Expense> _initial;
+  final List<int> deletedIds = [];
+
+  @override
+  AsyncValue<List<Expense>> build() => AsyncData(_initial);
+
+  @override
+  Future<bool> deleteExpense({required int id}) async {
+    deletedIds.add(id);
+    state = AsyncData((state.value ?? []).where((e) => e.id != id).toList());
+    return true;
+  }
 }

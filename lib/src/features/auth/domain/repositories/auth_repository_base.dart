@@ -48,11 +48,16 @@ abstract class AuthRepositoryBase {
   /// Fase Onboarding: Vincula a un usuario a un hogar existente mediante código de invitación
   Future<Result<UserProfile, AuthFailure>> joinHousehold({
     required String inviteCode,
-    required String userId,
   });
 
   /// Obtiene los miembros de un hogar por su ID
   Future<Result<List<UserProfile>, AuthFailure>> getHouseholdMembers({
     required int householdId,
   });
+
+  /// Sale del hogar actual
+  Future<Result<void, AuthFailure>> leaveHousehold();
+
+  /// Elimina el hogar actual (solo admin)
+  Future<Result<void, AuthFailure>> deleteHousehold();
 }

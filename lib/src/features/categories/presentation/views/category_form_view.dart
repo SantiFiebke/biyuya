@@ -1,5 +1,6 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
+import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -131,15 +132,8 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
                 ),
                 textCapitalization: TextCapitalization.words,
                 enabled: !_saving,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Por favor, ingresa un nombre';
-                  }
-                  if (value.trim().length < 2) {
-                    return 'El nombre debe tener al menos 2 caracteres';
-                  }
-                  return null;
-                },
+                maxLength: FormValidators.categoryNameMaxLength,
+                validator: FormValidators.categoryName,
               ),
               const SizedBox(height: 24),
               ColorPickerRow(

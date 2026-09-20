@@ -65,11 +65,12 @@ Expense makeExpense({
   String? description = 'Test expense',
   int householdId = 1,
   int categoryId = 1,
+  DateTime? date,
 }) {
   return Expense(
     id: id,
     amount: amount,
-    date: DateTime(2025, 7),
+    date: date ?? DateTime(2025, 7),
     description: description,
     householdId: householdId,
     categoryId: categoryId,

@@ -27,5 +27,28 @@ void main() {
 
       expect(model.householdId, isNull);
     });
+
+    test('parses role owner', () {
+      final model = UserProfileModel.fromJson(const {
+        'id': 'u1',
+        'name': 'Ana',
+        'last_name': 'Perez',
+        'household_id': 1,
+        'role': 'owner',
+      });
+      expect(model.role, 'owner');
+      expect(model.isOwner, isTrue);
+    });
+
+    test('defaults role to member when missing', () {
+      final model = UserProfileModel.fromJson(const {
+        'id': 'u1',
+        'name': 'Ana',
+        'last_name': 'Perez',
+        'household_id': null,
+      });
+      expect(model.role, 'member');
+      expect(model.isOwner, isFalse);
+    });
   });
 }

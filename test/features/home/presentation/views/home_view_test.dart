@@ -5,7 +5,6 @@ import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
-import 'package:biyuya/src/features/expenses/presentation/views/expense_list_view.dart';
 import 'package:biyuya/src/features/home/presentation/views/home_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,86 +42,70 @@ List<Override> _baseOverrides({
   ];
 }
 
+Future<void> _pumpHome(WidgetTester tester, {List<Override>? overrides}) async {
+  tester.view.physicalSize = const Size(1080, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    wrapTest(child: const HomeView(), overrides: overrides ?? _baseOverrides()),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+}
+
 void main() {
   group('HomeView', () {
-    testWidgets('renders household name in header', (tester) async {
-      await tester.pumpWidget(
-        wrapTest(child: const HomeView(), overrides: _baseOverrides()),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    testWidgets('renders app bar title', (tester) async {
+      await _pumpHome(tester);
 
-      expect(find.text('Mi Hogar'), findsOneWidget);
+      expect(find.text('Cuentas claras'), findsOneWidget);
     });
 
-    testWidgets('shows empty state when no expenses', (tester) async {
-      await tester.pumpWidget(
-        wrapTest(child: const HomeView(), overrides: _baseOverrides()),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    testWidgets('balance card shows monthly label and amount', (tester) async {
+      final expenses = [makeExpense(date: DateTime.now())];
 
-      expect(find.byType(EmptyExpenses), findsOneWidget);
-      expect(find.text('No hay gastos'), findsOneWidget);
+      await _pumpHome(tester, overrides: _baseOverrides(expenses: expenses));
+
+      expect(find.text('Gastado este mes'), findsOneWidget);
+      expect(find.textContaining('100,00', findRichText: true), findsWidgets);
     });
 
-    testWidgets('shows recent expenses list', (tester) async {
+    testWidgets('renders quick actions', (tester) async {
+      await _pumpHome(tester);
+
+      expect(find.text('Nuevo gasto'), findsOneWidget);
+      expect(find.text('Reportes'), findsOneWidget);
+      expect(find.text('Categorías'), findsOneWidget);
+    });
+
+    testWidgets('shows recent movements when there are expenses', (
+      tester,
+    ) async {
       final expenses = [
         makeExpense(description: 'Groceries'),
         makeExpense(id: 2, description: 'Bus ticket'),
       ];
 
-      await tester.pumpWidget(
-        wrapTest(
-          child: const HomeView(),
-          overrides: _baseOverrides(expenses: expenses),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await _pumpHome(tester, overrides: _baseOverrides(expenses: expenses));
 
-      expect(find.text('Últimos gastos'), findsOneWidget);
+      expect(find.text('Últimos movimientos'), findsOneWidget);
       expect(find.text('Groceries'), findsOneWidget);
       expect(find.text('Bus ticket'), findsOneWidget);
     });
 
-    testWidgets('FAB exists for new expense', (tester) async {
-      await tester.pumpWidget(
-        wrapTest(child: const HomeView(), overrides: _baseOverrides()),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    testWidgets('shows empty state when there are no expenses', (tester) async {
+      await _pumpHome(tester);
+
+      expect(find.text('Todavía no hay gastos'), findsOneWidget);
+    });
+
+    testWidgets('has FAB for new expense', (tester) async {
+      await _pumpHome(tester);
 
       expect(find.byType(FloatingActionButton), findsOneWidget);
       expect(find.byIcon(Icons.add), findsOneWidget);
-    });
-
-    testWidgets('shows invite code sheet on action', (tester) async {
-      tester.view.physicalSize = const Size(1080, 1920);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      await tester.pumpWidget(
-        wrapTest(
-          child: const HomeView(),
-          overrides: _baseOverrides(
-            householdData: const HouseholdData(
-              name: 'Mi Hogar',
-              inviteCode: 'ABC123',
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      await tester.tap(find.byIcon(Icons.person_add));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(find.text('Invitar a tu hogar'), findsOneWidget);
-      expect(find.text('ABC123'), findsOneWidget);
     });
   });
 }

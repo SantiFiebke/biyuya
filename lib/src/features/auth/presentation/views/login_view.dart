@@ -1,4 +1,5 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_form_controller.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -92,17 +93,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
                     ),
                     keyboardType: TextInputType.emailAddress,
                     enabled: !isLoading,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, ingresa tu correo';
-                      }
-                      if (!RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(value)) {
-                        return 'Ingresa un correo válido';
-                      }
-                      return null;
-                    },
+                    validator: FormValidators.email,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -121,15 +112,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
                     ),
                     obscureText: !showPassword,
                     enabled: !isLoading,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, ingresa tu contraseña';
-                      }
-                      if (value.length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
-                      }
-                      return null;
-                    },
+                    validator: FormValidators.loginPassword,
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(

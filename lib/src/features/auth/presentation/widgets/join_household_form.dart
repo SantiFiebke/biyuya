@@ -1,3 +1,5 @@
+import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 class JoinHouseholdForm extends StatefulWidget {
@@ -46,17 +48,12 @@ class JoinHouseholdFormState extends State<JoinHouseholdForm> {
               prefixIcon: Icon(Icons.vpn_key_outlined),
             ),
             textCapitalization: TextCapitalization.characters,
-            maxLength: 6,
+            maxLength: FormValidators.inviteCodeLength,
             enabled: !widget.isLoading,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Por favor, ingresa el código';
-              }
-              if (value.trim().length != 6) {
-                return 'El código debe tener 6 caracteres';
-              }
-              return null;
-            },
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
+            ],
+            validator: FormValidators.inviteCode,
           ),
           const SizedBox(height: 24),
           ElevatedButton(

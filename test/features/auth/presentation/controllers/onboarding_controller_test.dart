@@ -10,13 +10,21 @@ import 'package:multiple_result/multiple_result.dart' as mr;
 class FakeAuthRepository implements AuthRepositoryBase {
   final List<String> calls = [];
   String? lastHouseholdName;
+  String? lastInviteCode;
   late mr.Result<Household, AuthFailure>? _nextResult;
+  late mr.Result<UserProfile, AuthFailure>? _nextJoinResult;
 
   set nextResult(mr.Result<Household, AuthFailure> result) {
     _nextResult = result;
   }
 
   mr.Result<Household, AuthFailure>? get nextResult => _nextResult;
+
+  set nextJoinResult(mr.Result<UserProfile, AuthFailure> result) {
+    _nextJoinResult = result;
+  }
+
+  mr.Result<UserProfile, AuthFailure>? get nextJoinResult => _nextJoinResult;
 
   @override
   Future<mr.Result<Household, AuthFailure>> createHousehold({
@@ -25,6 +33,15 @@ class FakeAuthRepository implements AuthRepositoryBase {
     calls.add('createHousehold');
     lastHouseholdName = householdName;
     return _nextResult!;
+  }
+
+  @override
+  Future<mr.Result<UserProfile, AuthFailure>> joinHousehold({
+    required String inviteCode,
+  }) async {
+    calls.add('joinHousehold');
+    lastInviteCode = inviteCode;
+    return _nextJoinResult!;
   }
 
   // -- Unimplemented stubs (should never be called) --
@@ -58,15 +75,17 @@ class FakeAuthRepository implements AuthRepositoryBase {
       throw UnimplementedError();
 
   @override
-  Future<mr.Result<UserProfile, AuthFailure>> joinHousehold({
-    required String inviteCode,
-    required String userId,
-  }) => throw UnimplementedError();
-
-  @override
   Future<mr.Result<List<UserProfile>, AuthFailure>> getHouseholdMembers({
     required int householdId,
   }) => throw UnimplementedError();
+
+  @override
+  Future<mr.Result<void, AuthFailure>> leaveHousehold() =>
+      throw UnimplementedError();
+
+  @override
+  Future<mr.Result<void, AuthFailure>> deleteHousehold() =>
+      throw UnimplementedError();
 }
 
 void main() {
@@ -129,5 +148,50 @@ void main() {
       // No household stored
       expect(notifier.createdHousehold, isNull);
     });
+  });
+
+  group('OnboardingController.joinExistingHousehold', () {
+    test(
+      'success: sets AsyncData, calls repo once with correct inviteCode',
+      () async {
+        const profile = UserProfile(
+          id: 'u-1',
+          name: 'Ada',
+          lastName: 'Lovelace',
+          householdId: 'h-42',
+        );
+        fake.nextJoinResult = const mr.Success(profile);
+
+        final container = createContainer();
+        addTearDown(container.dispose);
+
+        final notifier = container.read(onboardingControllerProvider.notifier);
+        await notifier.joinExistingHousehold('ABC123');
+
+        final state = container.read(onboardingControllerProvider);
+        expect(state, isA<AsyncData<void>>());
+
+        expect(fake.calls, contains('joinHousehold'));
+        expect(fake.lastInviteCode, 'ABC123');
+      },
+    );
+
+    test(
+      'error: sets AsyncError when repo returns invalid code failure',
+      () async {
+        fake.nextJoinResult = const mr.Error(
+          AuthFailure('Código de invitación no válido.'),
+        );
+
+        final container = createContainer();
+        addTearDown(container.dispose);
+
+        final notifier = container.read(onboardingControllerProvider.notifier);
+        await notifier.joinExistingHousehold('BAD');
+
+        final state = container.read(onboardingControllerProvider);
+        expect(state, isA<AsyncError<void>>());
+      },
+    );
   });
 }

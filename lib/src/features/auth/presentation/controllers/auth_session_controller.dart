@@ -4,6 +4,11 @@ import 'package:biyuya/src/core/data/widget_daily_total_sync.dart';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
 import 'package:biyuya/src/features/auth/provider/auth_repository_provider.dart';
+import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
+import 'package:biyuya/src/features/auth/provider/household_provider.dart';
+import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
+import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:multiple_result/multiple_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'auth_session_controller.g.dart';
@@ -53,6 +58,34 @@ class AuthSessionController extends _$AuthSessionController {
       _profileSubscription = null;
       unawaited(WidgetDailyTotalSync.clearTotal());
     }, (failure) => throw Exception(failure.message));
+  }
+
+  Future<Result<void, AuthFailure>> leaveHousehold() async {
+    final repository = ref.read(authRepositoryProvider);
+    final result = await repository.leaveHousehold();
+    result.when((_) {
+      _invalidateHouseholdData();
+      unawaited(WidgetDailyTotalSync.clearTotal());
+    }, (_) {});
+    return result;
+  }
+
+  Future<Result<void, AuthFailure>> deleteHousehold() async {
+    final repository = ref.read(authRepositoryProvider);
+    final result = await repository.deleteHousehold();
+    result.when((_) {
+      _invalidateHouseholdData();
+      unawaited(WidgetDailyTotalSync.clearTotal());
+    }, (_) {});
+    return result;
+  }
+
+  void _invalidateHouseholdData() {
+    ref
+      ..invalidate(categoryControllerProvider)
+      ..invalidate(expenseControllerProvider)
+      ..invalidate(householdNameProvider)
+      ..invalidate(householdMembersProvider);
   }
 
   void _subscribeToProfileChanges(

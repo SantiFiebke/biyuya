@@ -319,4 +319,54 @@ void main() {
       expect(find.byIcon(Icons.home), findsNothing);
     });
   });
+
+  group('ExpenseFormView validation', () {
+    testWidgets('shows error for zero amount', (tester) async {
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).first, '0');
+      await tester.ensureVisible(find.text('Guardar'));
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('El monto debe ser mayor a 0'), findsOneWidget);
+    });
+
+    testWidgets('accepts comma decimal amount', (tester) async {
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).first, '1234,56');
+      await tester.ensureVisible(find.text('Guardar'));
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ingresá un monto'), findsNothing);
+      expect(find.text('El monto debe ser mayor a 0'), findsNothing);
+      expect(
+        find.text('Ingresá un monto válido (máx. 2 decimales)'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('description field maxLength is 200', (tester) async {
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextField>(
+        find.descendant(
+          of: find.widgetWithText(TextFormField, 'Descripción (opcional)'),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(field.maxLength, 200);
+    });
+  });
 }

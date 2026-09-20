@@ -6,15 +6,18 @@ class UserProfile extends Equatable {
     required this.name,
     required this.lastName,
     this.householdId,
+    this.role = 'member',
   });
 
   final String id;
   final String name;
   final String lastName;
   final String? householdId;
+  final String role;
 
   bool get hasHousehold => householdId != null && householdId!.isNotEmpty;
+  bool get isOwner => role == 'owner';
 
   @override
-  List<Object?> get props => [id, name, lastName, householdId];
+  List<Object?> get props => [id, name, lastName, householdId, role];
 }

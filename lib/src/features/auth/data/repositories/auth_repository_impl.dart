@@ -134,29 +134,13 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   @override
   Future<Result<UserProfile, AuthFailure>> joinHousehold({
     required String inviteCode,
-    required String userId,
   }) async {
     try {
-      final householdData = await _client
-          .from('households')
-          .select('id')
-          .eq('invite_code', inviteCode.toUpperCase())
-          .maybeSingle();
-
-      if (householdData == null) {
-        return const Error(AuthFailure('Código de invitación no válido.'));
-      }
-
-      final householdId = (householdData['id'] as num).toString();
-
-      final updatedData = await _client
-          .from('profiles')
-          .update({'household_id': householdId})
-          .eq('id', userId)
-          .select()
-          .single();
-
-      return Success(UserProfileModel.fromJson(updatedData));
+      final data = await _client.rpc<Map<String, dynamic>>(
+        'join_household',
+        params: <String, dynamic>{'p_invite_code': inviteCode},
+      );
+      return Success(UserProfileModel.fromJson(data));
     } on Exception catch (e) {
       return Error(AuthFailure('Error al unirse al hogar: $e'));
     }
@@ -187,6 +171,26 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
       return const Success(null);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al cerrar sesión: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void, AuthFailure>> leaveHousehold() async {
+    try {
+      await _client.rpc<void>('leave_household');
+      return const Success(null);
+    } on Exception catch (e) {
+      return Error(AuthFailure('Error al salir del hogar: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void, AuthFailure>> deleteHousehold() async {
+    try {
+      await _client.rpc<void>('delete_household');
+      return const Success(null);
+    } on Exception catch (e) {
+      return Error(AuthFailure('Error al eliminar el hogar: $e'));
     }
   }
 }
