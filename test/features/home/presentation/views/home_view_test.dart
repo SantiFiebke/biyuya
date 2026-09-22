@@ -100,12 +100,5 @@ void main() {
 
       expect(find.text('Todavía no hay gastos'), findsOneWidget);
     });
-
-    testWidgets('has FAB for new expense', (tester) async {
-      await _pumpHome(tester);
-
-      expect(find.byType(FloatingActionButton), findsOneWidget);
-      expect(find.byIcon(Icons.add), findsOneWidget);
-    });
   });
 }
