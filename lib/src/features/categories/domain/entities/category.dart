@@ -8,6 +8,7 @@ class Category extends Equatable {
     required this.createdAt,
     this.color,
     this.icon,
+    this.budgetAmount,
   });
 
   final int id;
@@ -16,7 +17,16 @@ class Category extends Equatable {
   final String? icon;
   final int householdId;
   final DateTime createdAt;
+  final double? budgetAmount;
 
   @override
-  List<Object?> get props => [id, name, color, icon, householdId, createdAt];
+  List<Object?> get props => [
+    id,
+    name,
+    color,
+    icon,
+    householdId,
+    createdAt,
+    budgetAmount,
+  ];
 }

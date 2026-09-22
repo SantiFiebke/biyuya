@@ -50,12 +50,18 @@ Future<void> waitForLoad() async {
 // Factory functions
 // ---------------------------------------------------------------------------
 
-Category makeCategory({int id = 1, String name = 'Test', int householdId = 1}) {
+Category makeCategory({
+  int id = 1,
+  String name = 'Test',
+  int householdId = 1,
+  double? budgetAmount,
+}) {
   return Category(
     id: id,
     name: name,
     householdId: householdId,
     createdAt: DateTime(2025),
+    budgetAmount: budgetAmount,
   );
 }
 
@@ -84,12 +90,13 @@ MonthlyReport makeReport({
   double variation = 25.0,
   int year = 2025,
   int month = 7,
+  List<CategoryBreakdown> categoryBreakdowns = const <CategoryBreakdown>[],
 }) {
   return MonthlyReport(
     total: total,
     previousTotal: previousTotal,
     variation: variation,
-    categoryBreakdowns: const <CategoryBreakdown>[],
+    categoryBreakdowns: categoryBreakdowns,
     year: year,
     month: month,
   );
@@ -102,10 +109,12 @@ MonthlyReport makeReport({
 Widget wrapTest({
   required Widget child,
   List<Override> overrides = const <Override>[],
+  ThemeData? theme,
 }) {
   return ProviderScope(
     overrides: overrides,
     child: MaterialApp(
+      theme: theme,
       localizationsDelegates: const [
         ...GlobalCupertinoLocalizations.delegates,
         ...GlobalMaterialLocalizations.delegates,

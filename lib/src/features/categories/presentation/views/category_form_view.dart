@@ -42,6 +42,7 @@ class CategoryFormView extends ConsumerStatefulWidget {
 class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
+  late final TextEditingController _budgetController;
   String? _selectedColor;
   IconData? _selectedIcon;
 
@@ -54,6 +55,9 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
     super.initState();
     final cat = widget.category;
     _nameController = TextEditingController(text: cat?.name ?? '');
+    _budgetController = TextEditingController(
+      text: cat?.budgetAmount?.toString() ?? '',
+    );
     _selectedColor = cat?.color;
     _selectedIcon = cat?.icon != null
         ? _presetIcons.firstWhere(
@@ -66,6 +70,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
   @override
   void dispose() {
     _nameController.dispose();
+    _budgetController.dispose();
     super.dispose();
   }
 
@@ -77,6 +82,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
     final name = _nameController.text.trim();
     final iconCode = _selectedIcon?.codePoint.toString();
     final categoryId = widget.category?.id;
+    final budgetAmount = FormValidators.parseAmount(_budgetController.text);
 
     final success = await ref
         .read(categoryControllerProvider.notifier)
@@ -84,6 +90,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
           name: name,
           color: _selectedColor,
           icon: iconCode,
+          budgetAmount: budgetAmount,
           categoryId: categoryId,
         );
 
@@ -125,6 +132,32 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
                 enabled: !_saving,
                 maxLength: FormValidators.categoryNameMaxLength,
                 validator: FormValidators.categoryName,
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _budgetController,
+                decoration: const InputDecoration(
+                  labelText: 'Límite mensual (ARS)',
+                  prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: const [DecimalTextInputFormatter()],
+                enabled: !_saving,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return null;
+                  }
+                  final parsed = FormValidators.parseAmount(value);
+                  if (parsed == null) {
+                    return 'Ingresá un monto válido';
+                  }
+                  if (parsed <= 0) {
+                    return 'El monto debe ser mayor a 0';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
               Text('Color', style: Theme.of(context).textTheme.titleMedium),

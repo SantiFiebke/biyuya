@@ -7,6 +7,7 @@ import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart'
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:biyuya/src/features/reports/presentation/views/report_view.dart';
 import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
+import 'package:biyuya/theme/theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
@@ -44,6 +45,20 @@ const _testReport = MonthlyReport(
 void main() {
   late MockReportRepository mockRepo;
 
+  final theme = MaterialTheme(ThemeData().textTheme).light();
+
+  CategoryBreakdown breakdown({double amount = 600, double? budgetAmount}) {
+    return CategoryBreakdown(
+      categoryId: 1,
+      categoryName: 'Food',
+      amount: amount,
+      percentage: 60,
+      categoryColor: '#4CAF50',
+      categoryIcon: '63046',
+      budgetAmount: budgetAmount,
+    );
+  }
+
   setUp(() {
     mockRepo = MockReportRepository();
     when(
@@ -59,6 +74,29 @@ void main() {
     reportRepositoryProvider.overrideWithValue(mockRepo),
     authSessionControllerProvider.overrideWith(FakeAuthSessionController.new),
   ];
+
+  Future<void> pumpReport(WidgetTester tester) async {
+    await tester.pumpWidget(
+      wrapTest(
+        child: const ReportView(),
+        overrides: defaultOverrides(),
+        theme: theme,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+
+  void stubReport(MonthlyReport report) {
+    when(
+      () => mockRepo.getMonthlyReport(
+        householdId: any(named: 'householdId'),
+        year: any(named: 'year'),
+        month: any(named: 'month'),
+      ),
+    ).thenAnswer((_) async => Success(report));
+  }
 
   group('ReportView', () {
     testWidgets('renders app bar with title Reportes', (tester) async {
@@ -164,6 +202,56 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.text('No se pudo cargar el reporte'), findsOneWidget);
+    });
+
+    testWidgets('shows progress bar when breakdown has budget', (tester) async {
+      stubReport(
+        makeReport(categoryBreakdowns: [breakdown(budgetAmount: 500)]),
+      );
+
+      await pumpReport(tester);
+
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('hides progress bar when breakdown has no budget', (
+      tester,
+    ) async {
+      stubReport(makeReport(categoryBreakdowns: [breakdown()]));
+
+      await pumpReport(tester);
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    });
+
+    testWidgets('bar is expense color when ratio exceeds 1', (tester) async {
+      stubReport(
+        makeReport(
+          categoryBreakdowns: [breakdown(budgetAmount: 500)],
+        ),
+      );
+
+      await pumpReport(tester);
+
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.color, theme.extension<AppColors>()!.expense);
+    });
+
+    testWidgets('bar is income color when ratio below 0.75', (tester) async {
+      stubReport(
+        makeReport(
+          categoryBreakdowns: [breakdown(amount: 300, budgetAmount: 500)],
+        ),
+      );
+
+      await pumpReport(tester);
+
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.color, theme.extension<AppColors>()!.income);
     });
   });
 }

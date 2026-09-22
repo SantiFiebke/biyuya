@@ -120,6 +120,7 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
           categoryName: category?.name ?? 'Sin categoría',
           categoryColor: category?.color,
           categoryIcon: category?.icon,
+          budgetAmount: category?.budgetAmount,
           amount: amount,
           percentage: percentage,
         ),

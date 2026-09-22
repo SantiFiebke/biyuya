@@ -40,6 +40,45 @@ void main() {
       expect(model.name, 'Utilities');
     });
 
+    test('parses budget_amount when present', () {
+      final json = <String, dynamic>{
+        'id': 3,
+        'name': 'Dining',
+        'color': '#E91E63',
+        'icon': null,
+        'household_id': 42,
+        'created_at': '2025-02-01T00:00:00.000Z',
+        'budget_amount': 250.75,
+      };
+
+      final model = CategoryModel.fromJson(json);
+
+      expect(model.budgetAmount, 250.75);
+    });
+
+    test('budgetAmount is null when budget_amount absent or null', () {
+      final absent = CategoryModel.fromJson(const <String, dynamic>{
+        'id': 4,
+        'name': 'Misc',
+        'color': null,
+        'icon': null,
+        'household_id': 42,
+        'created_at': '2025-02-01T00:00:00.000Z',
+      });
+      final explicitNull = CategoryModel.fromJson(const <String, dynamic>{
+        'id': 5,
+        'name': 'Misc',
+        'color': null,
+        'icon': null,
+        'household_id': 42,
+        'created_at': '2025-02-01T00:00:00.000Z',
+        'budget_amount': null,
+      });
+
+      expect(absent.budgetAmount, isNull);
+      expect(explicitNull.budgetAmount, isNull);
+    });
+
     test('parses int id and householdId from num (bigint from Postgres)', () {
       final json = <String, dynamic>{
         'id': 9999999999, // bigint comes as num from Supabase
@@ -76,6 +115,21 @@ void main() {
       expect(json['color'], '#000000');
       expect(json['icon'], '123');
       expect(json['household_id'], 1);
+    });
+
+    test('includes budget_amount', () {
+      final model = CategoryModel(
+        id: 11,
+        name: 'Test',
+        householdId: 1,
+        createdAt: DateTime(2025),
+        budgetAmount: 99.5,
+      );
+
+      final json = model.toJson();
+
+      expect(json.containsKey('budget_amount'), isTrue);
+      expect(json['budget_amount'], 99.5);
     });
 
     test('round-trip preserves identity', () {

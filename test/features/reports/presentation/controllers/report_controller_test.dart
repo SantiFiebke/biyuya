@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/categories/domain/repositories/category_repository_base.dart';
 import 'package:biyuya/src/features/reports/data/repositories/report_repository_impl.dart';
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
@@ -7,10 +10,58 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../../../../helpers/test_helpers.dart';
 
 class MockReportRepository extends Mock implements ReportRepositoryImpl {}
+
+class MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
+
+class MockCategoryRepository extends Mock implements CategoryRepositoryBase {}
+
+/// Minimal fake of the PostgREST chain used by [ReportRepositoryImpl].
+/// ponytail: only `select`/`eq`/`gte`/`lte` are exercised; everything else
+/// returns itself so the chain type-checks.
+class _FakeQueryBuilder implements supabase.SupabaseQueryBuilder {
+  _FakeQueryBuilder(this.rows);
+
+  final List<Map<String, dynamic>> rows;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => _FakeFilterBuilder(rows);
+}
+
+class _FakeFilterBuilder
+    implements supabase.PostgrestFilterBuilder<supabase.PostgrestList> {
+  _FakeFilterBuilder(this.rows);
+
+  final List<Map<String, dynamic>> rows;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => this;
+
+  @override
+  Future<R> then<R>(
+    FutureOr<R> Function(supabase.PostgrestList) onValue, {
+    Function? onError,
+  }) => Future<supabase.PostgrestList>.value(
+    rows,
+  ).then(onValue, onError: onError);
+}
+
+Map<String, dynamic> _expenseRow({
+  int id = 1,
+  double amount = 100,
+  int categoryId = 1,
+}) => {
+  'id': id,
+  'amount': amount,
+  'date': '2025-07-15T00:00:00.000',
+  'household_id': 1,
+  'category_id': categoryId,
+  'created_at': '2025-07-15T00:00:00.000',
+};
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -233,6 +284,64 @@ void main() {
       final state = container.read(reportControllerProvider);
       expect(state.value!.month, 3);
       expect(state.value!.year, 2024);
+    });
+  });
+
+  group('ReportController budgetAmount propagation', () {
+    late MockSupabaseClient mockClient;
+    late MockCategoryRepository mockCategoryRepo;
+    late ProviderContainer budgetContainer;
+
+    setUp(() {
+      mockClient = MockSupabaseClient();
+      mockCategoryRepo = MockCategoryRepository();
+
+      when(
+        () => mockClient.from(any()),
+      ).thenAnswer((_) => _FakeQueryBuilder([_expenseRow()]));
+
+      budgetContainer = ProviderContainer(
+        overrides: [
+          reportRepositoryProvider.overrideWith(
+            (ref) => ReportRepositoryImpl(mockClient, mockCategoryRepo),
+          ),
+          authSessionControllerProvider.overrideWith(
+            FakeAuthSessionController.new,
+          ),
+        ],
+      );
+    });
+
+    tearDown(() {
+      budgetContainer.dispose();
+    });
+
+    test('breakdown carries category budgetAmount', () async {
+      when(
+        () => mockCategoryRepo.getCategories(householdId: 1),
+      ).thenAnswer((_) async => Success([makeCategory(budgetAmount: 300)]));
+
+      budgetContainer.read(reportControllerProvider);
+      await waitForLoad();
+
+      final state = budgetContainer.read(reportControllerProvider);
+      final breakdown = state.value!.categoryBreakdowns.single;
+      expect(breakdown.categoryId, 1);
+      expect(breakdown.budgetAmount, 300);
+    });
+
+    test('breakdown budgetAmount is null when category has none', () async {
+      when(
+        () => mockCategoryRepo.getCategories(householdId: 1),
+      ).thenAnswer((_) async => Success([makeCategory()]));
+
+      budgetContainer.read(reportControllerProvider);
+      await waitForLoad();
+
+      final state = budgetContainer.read(reportControllerProvider);
+      final breakdown = state.value!.categoryBreakdowns.single;
+      expect(breakdown.categoryId, 1);
+      expect(breakdown.budgetAmount, isNull);
     });
   });
 }

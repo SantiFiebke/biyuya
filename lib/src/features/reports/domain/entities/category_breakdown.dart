@@ -8,6 +8,7 @@ class CategoryBreakdown extends Equatable {
     required this.percentage,
     this.categoryColor,
     this.categoryIcon,
+    this.budgetAmount,
   });
 
   final int categoryId;
@@ -16,6 +17,7 @@ class CategoryBreakdown extends Equatable {
   final String? categoryIcon;
   final double amount;
   final double percentage;
+  final double? budgetAmount;
 
   @override
   List<Object?> get props => [
@@ -25,5 +27,6 @@ class CategoryBreakdown extends Equatable {
     percentage,
     categoryColor,
     categoryIcon,
+    budgetAmount,
   ];
 }

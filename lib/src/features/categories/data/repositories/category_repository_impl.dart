@@ -33,6 +33,7 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
     required int householdId,
     String? color,
     String? icon,
+    double? budgetAmount,
   }) async {
     try {
       final data = await _client
@@ -42,6 +43,7 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
             'color': color,
             'icon': icon,
             'household_id': householdId,
+            'budget_amount': budgetAmount,
           })
           .select()
           .single();
@@ -58,11 +60,17 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
     required String name,
     String? color,
     String? icon,
+    double? budgetAmount,
   }) async {
     try {
       final data = await _client
           .from('categories')
-          .update({'name': name, 'color': color, 'icon': icon})
+          .update({
+            'name': name,
+            'color': color,
+            'icon': icon,
+            'budget_amount': budgetAmount,
+          })
           .eq('id', id)
           .select()
           .single();

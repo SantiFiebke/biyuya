@@ -25,6 +25,7 @@ abstract class CategoryRepositoryBase {
     required int householdId,
     String? color,
     String? icon,
+    double? budgetAmount,
   });
 
   /// Actualiza una categoría existente
@@ -33,6 +34,7 @@ abstract class CategoryRepositoryBase {
     required String name,
     String? color,
     String? icon,
+    double? budgetAmount,
   });
 
   /// Elimina una categoría

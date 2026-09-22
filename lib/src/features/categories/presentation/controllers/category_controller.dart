@@ -38,6 +38,7 @@ class CategoryController extends _$CategoryController {
     required String name,
     String? color,
     String? icon,
+    double? budgetAmount,
   }) async {
     final session = ref.read(authSessionControllerProvider);
     final householdId = session.value?.householdId;
@@ -54,6 +55,7 @@ class CategoryController extends _$CategoryController {
       name: name,
       color: color,
       icon: icon,
+      budgetAmount: budgetAmount,
       householdId: int.parse(householdId),
     );
 
@@ -75,6 +77,7 @@ class CategoryController extends _$CategoryController {
     required String name,
     String? color,
     String? icon,
+    double? budgetAmount,
   }) async {
     final previous = state.value ?? [];
 
@@ -85,6 +88,7 @@ class CategoryController extends _$CategoryController {
       name: name,
       color: color,
       icon: icon,
+      budgetAmount: budgetAmount,
     );
 
     // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
@@ -110,6 +114,7 @@ class CategoryController extends _$CategoryController {
     required String name,
     String? color,
     String? icon,
+    double? budgetAmount,
     int? categoryId, // null = create, non-null = update
   }) {
     if (categoryId != null) {
@@ -118,9 +123,15 @@ class CategoryController extends _$CategoryController {
         name: name,
         color: color,
         icon: icon,
+        budgetAmount: budgetAmount,
       );
     }
-    return createCategory(name: name, color: color, icon: icon);
+    return createCategory(
+      name: name,
+      color: color,
+      icon: icon,
+      budgetAmount: budgetAmount,
+    );
   }
 
   Future<bool> deleteCategory({required int id}) async {

@@ -241,17 +241,85 @@ class CategoryBreakdownTile extends StatelessWidget {
         Theme.of(context).colorScheme.primary;
     final icon = iconFromCodePoint(breakdown.categoryIcon);
 
+    final budget = breakdown.budgetAmount;
+    final hasBudget = budget != null && budget > 0;
+    final limit = budget ?? 0.0;
+    final appColors = Theme.of(context).extension<AppColors>();
+    final ratio = hasBudget ? breakdown.amount / limit : 0.0;
+    final barColor = ratio > 1.0
+        ? (appColors?.expense ?? Theme.of(context).colorScheme.error)
+        : ratio >= 0.75
+        ? Colors.amber.shade600
+        : (appColors?.income ?? Theme.of(context).colorScheme.primary);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: onTap,
-        leading: CategoryAvatar(icon: icon, color: color),
-        title: Text(breakdown.categoryName),
-        subtitle: Text('${breakdown.percentage.toStringAsFixed(1)}%'),
-        trailing: AmountText(
-          amount: breakdown.amount,
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            onTap: onTap,
+            leading: CategoryAvatar(icon: icon, color: color),
+            title: Text(breakdown.categoryName),
+            subtitle: Text('${breakdown.percentage.toStringAsFixed(1)}%'),
+            trailing: AmountText(
+              amount: breakdown.amount,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          if (hasBudget)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: ratio.clamp(0.0, 1.0),
+                      color: barColor,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Gastado',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          AmountText(
+                            amount: breakdown.amount,
+                            style: Theme.of(context).textTheme.bodySmall,
+                            color: barColor,
+                          ),
+                          Text(
+                            ' / ',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          AmountText(
+                            amount: limit,
+                            style: Theme.of(context).textTheme.bodySmall,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
