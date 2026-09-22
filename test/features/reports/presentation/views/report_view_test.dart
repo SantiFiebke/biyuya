@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
@@ -94,7 +95,14 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.text('Total del mes'), findsOneWidget);
-      expect(find.text(r'$1.000'), findsOneWidget);
+      // AmountText renders a RichText, so find.text('1.000') no longer matches.
+      final amountText = tester.widget<AmountText>(
+        find.descendant(
+          of: find.byType(SummaryCard),
+          matching: find.byType(AmountText),
+        ),
+      );
+      expect(amountText.amount, 1000);
     });
 
     testWidgets('shows ReportSkeleton when loading', (tester) async {
@@ -155,7 +163,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('Error al cargar reporte'), findsOneWidget);
+      expect(find.text('No se pudo cargar el reporte'), findsOneWidget);
     });
   });
 }

@@ -78,7 +78,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Fecha'), findsOneWidget);
-      expect(find.text('15/06/2025'), findsOneWidget);
+      expect(find.text('15 de junio'), findsOneWidget);
     });
 
     testWidgets('displays user name', (tester) async {

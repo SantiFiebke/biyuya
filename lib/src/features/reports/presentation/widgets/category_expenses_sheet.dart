@@ -30,6 +30,10 @@ class CategoryExpensesSheet extends ConsumerWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      clipBehavior: Clip.antiAlias,
       builder: (_) =>
           CategoryExpensesSheet(breakdown: breakdown, year: year, month: month),
     );

@@ -5,6 +5,7 @@ import 'package:biyuya/src/features/categories/presentation/controllers/category
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/views/expense_list_view.dart';
+import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_localizations/flutter_localizations.dart'
     show GlobalCupertinoLocalizations, GlobalWidgetsLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,6 +58,14 @@ final _testExpenses = [
 ];
 
 void main() {
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          SystemChannels.platform,
+          (methodCall) async => null,
+        );
+  });
+
   group('ExpenseListView', () {
     testWidgets('shows app bar with title', (tester) async {
       await tester.pumpWidget(

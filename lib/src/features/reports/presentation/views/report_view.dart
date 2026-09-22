@@ -2,14 +2,16 @@ import 'dart:async';
 
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
+import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
+import 'package:biyuya/src/core/presentation/widgets/category_avatar.dart';
 import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
 import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/category_expenses_sheet.dart';
+import 'package:biyuya/theme/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -91,12 +93,6 @@ class ReportContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amountFormat = NumberFormat.currency(
-      locale: 'es_AR',
-      symbol: '',
-      decimalDigits: 0,
-    );
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -108,7 +104,6 @@ class ReportContent extends StatelessWidget {
             total: report.total,
             previousTotal: report.previousTotal,
             variation: report.variation,
-            amountFormat: amountFormat,
           ),
           const SizedBox(height: 24),
           Text(
@@ -127,7 +122,6 @@ class ReportContent extends StatelessWidget {
             ...report.categoryBreakdowns.map(
               (breakdown) => CategoryBreakdownTile(
                 breakdown: breakdown,
-                amountFormat: amountFormat,
                 onTap: () => onCategoryTap(breakdown),
               ),
             ),
@@ -174,20 +168,20 @@ class SummaryCard extends StatelessWidget {
     required this.total,
     required this.previousTotal,
     required this.variation,
-    required this.amountFormat,
     super.key,
   });
 
   final double total;
   final double previousTotal;
   final double variation;
-  final NumberFormat amountFormat;
 
   @override
   Widget build(BuildContext context) {
     final isIncrease = variation > 0;
-    final variationColor = isIncrease ? Colors.red : Colors.green;
-    final formattedTotal = '\$${amountFormat.format(total)}'.trim();
+    final appColors = Theme.of(context).extension<AppColors>();
+    final variationColor = isIncrease
+        ? (appColors?.expense ?? Theme.of(context).colorScheme.error)
+        : (appColors?.income ?? Theme.of(context).colorScheme.primary);
 
     return Card(
       child: Padding(
@@ -201,12 +195,10 @@ class SummaryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              formattedTotal,
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+            AmountText(
+              amount: total,
+              style: Theme.of(context).textTheme.headlineLarge,
+              color: Theme.of(context).colorScheme.primary,
             ),
             if (previousTotal > 0) ...[
               const SizedBox(height: 12),
@@ -237,15 +229,9 @@ class SummaryCard extends StatelessWidget {
 }
 
 class CategoryBreakdownTile extends StatelessWidget {
-  const CategoryBreakdownTile({
-    required this.breakdown,
-    required this.amountFormat,
-    this.onTap,
-    super.key,
-  });
+  const CategoryBreakdownTile({required this.breakdown, this.onTap, super.key});
 
   final CategoryBreakdown breakdown;
-  final NumberFormat amountFormat;
   final VoidCallback? onTap;
 
   @override
@@ -259,22 +245,12 @@ class CategoryBreakdownTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         onTap: onTap,
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
+        leading: CategoryAvatar(icon: icon, color: color),
         title: Text(breakdown.categoryName),
         subtitle: Text('${breakdown.percentage.toStringAsFixed(1)}%'),
-        trailing: Text(
-          amountFormat.format(breakdown.amount),
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+        trailing: AmountText(
+          amount: breakdown.amount,
+          style: Theme.of(context).textTheme.titleSmall,
         ),
       ),
     );

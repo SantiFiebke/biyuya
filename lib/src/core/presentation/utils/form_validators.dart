@@ -30,19 +30,51 @@ class FormValidators {
     return null;
   }
 
+  /// Normaliza input de monto: elimina separadores de miles (.) y
+  /// convierte decimal (,) a punto para parsing.
+  /// En es_AR: punto = separador miles, coma = decimal.
+  static String _normalizeAmount(String value) {
+    final trimmed = value.trim();
+    final hasComma = trimmed.contains(',');
+    if (hasComma) {
+      // Con coma decimal → último punto es decimal, el resto son miles
+      final normalized = trimmed.replaceAll(',', '.');
+      final lastDot = normalized.lastIndexOf('.');
+      if (lastDot == -1) {
+        return normalized;
+      }
+      final intPart = normalized.substring(0, lastDot).replaceAll('.', '');
+      final decPart = normalized.substring(lastDot + 1);
+      return '$intPart.$decPart';
+    }
+    final lastDot = trimmed.lastIndexOf('.');
+    if (lastDot == -1) {
+      // Sin separador → sin cambios
+      return trimmed;
+    }
+    final trailing = trimmed.substring(lastDot + 1);
+    if (trailing.isNotEmpty && trailing.length <= 2) {
+      // Último punto es decimal, los anteriores son miles
+      final intPart = trimmed.substring(0, lastDot).replaceAll('.', '');
+      return '$intPart.$trailing';
+    }
+    // 3+ dígitos tras el último punto → todos los puntos son miles
+    return trimmed.replaceAll('.', '');
+  }
+
   /// Normaliza el separador decimal (coma -> punto) y parsea.
   static double? parseAmount(String? value) {
     if (value == null) {
       return null;
     }
-    return double.tryParse(value.trim().replaceAll(',', '.'));
+    return double.tryParse(_normalizeAmount(value));
   }
 
   static String? amount(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Ingresá un monto';
     }
-    final normalized = value.trim().replaceAll(',', '.');
+    final normalized = _normalizeAmount(value);
     if (!_amountRegExp.hasMatch(normalized)) {
       return 'Ingresá un monto válido (máx. 2 decimales)';
     }

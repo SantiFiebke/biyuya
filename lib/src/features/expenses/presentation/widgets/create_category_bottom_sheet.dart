@@ -1,20 +1,9 @@
+import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
+import 'package:biyuya/src/core/presentation/widgets/color_picker_row.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
-
-const _presetColors = [
-  '#F44336',
-  '#E91E63',
-  '#9C27B0',
-  '#673AB7',
-  '#3F51B5',
-  '#2196F3',
-  '#4CAF50',
-  '#FF9800',
-  '#795548',
-  '#607D8B',
-];
 
 /// Shows a modal bottom sheet for creating a new category.
 /// Returns the new category's ID if created, null otherwise.
@@ -61,27 +50,18 @@ Future<int?> showCreateCategorySheet(
                 validator: FormValidators.categoryName,
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                children: _presetColors.map((hex) {
-                  final color = Color(
-                    int.parse('FF${hex.substring(1)}', radix: 16),
+              ColorPickerRow(
+                colors: presetCategoryColors
+                    .map(parseCategoryColor)
+                    .whereType<Color>()
+                    .toList(),
+                selectedColor: parseCategoryColor(selectedColor),
+                onSelected: (color) {
+                  final hex = presetCategoryColors.firstWhere(
+                    (h) => parseCategoryColor(h) == color,
                   );
-                  return GestureDetector(
-                    onTap: () => setSheetState(() => selectedColor = hex),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: selectedColor == hex
-                            ? Border.all(color: Colors.white, width: 3)
-                            : null,
-                      ),
-                    ),
-                  );
-                }).toList(),
+                  setSheetState(() => selectedColor = hex);
+                },
               ),
               const SizedBox(height: 16),
               ElevatedButton(

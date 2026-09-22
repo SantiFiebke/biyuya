@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
@@ -18,7 +19,6 @@ class ExpenseDetailView extends ConsumerWidget {
         ?.where((c) => c.id == expense.categoryId)
         .firstOrNull;
 
-    final dateFormat = DateFormat('dd/MM/yyyy');
     final amountFormat = NumberFormat.currency(
       locale: 'es_AR',
       symbol: r'$',
@@ -74,7 +74,7 @@ class ExpenseDetailView extends ConsumerWidget {
             ),
             const Divider(height: 32),
 
-            _DetailRow(label: 'Fecha', value: dateFormat.format(expense.date)),
+            _DetailRow(label: 'Fecha', value: formatHumanDate(expense.date)),
             const Divider(height: 32),
 
             _DetailRow(

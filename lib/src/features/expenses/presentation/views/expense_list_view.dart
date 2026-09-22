@@ -113,6 +113,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     final asyncExpenses = ref.watch(expenseControllerProvider);
     final asyncMembers = ref.watch(householdMembersProvider);
     final members = asyncMembers.value ?? [];
+    final categories = ref.watch(categoryControllerProvider).value ?? [];
 
     ref.listen<AsyncValue<List<Expense>>>(expenseControllerProvider, (
       _,
@@ -208,8 +209,15 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
                         separatorBuilder: (_, _) => const SizedBox(height: 2),
                         itemBuilder: (context, index) {
                           final expense = filtered[index];
+                          final category = categories
+                              .cast<Category?>()
+                              .firstWhere(
+                                (c) => c?.id == expense.categoryId,
+                                orElse: () => null,
+                              );
                           return ExpenseListTile(
                             expense: expense,
+                            category: category,
                             onTap: () => context.push(
                               AppRoute.expenseEdit(expense.id.toString()),
                               extra: expense,
@@ -451,26 +459,22 @@ class SummaryCard extends StatelessWidget {
   }
 }
 
-class ExpenseListTile extends ConsumerWidget {
+class ExpenseListTile extends StatelessWidget {
   const ExpenseListTile({
     required this.expense,
+    required this.category,
     required this.onTap,
     required this.onDelete,
     super.key,
   });
 
   final Expense expense;
+  final Category? category;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final asyncCategories = ref.watch(categoryControllerProvider);
-    final categories = asyncCategories.value ?? [];
-    final category = categories.cast<Category?>().firstWhere(
-      (c) => c?.id == expense.categoryId,
-      orElse: () => null,
-    );
+  Widget build(BuildContext context) {
     final expenseColor = Theme.of(context).extension<AppColors>()?.expense;
     final icon = iconFromCodePoint(category?.icon);
     final color = parseCategoryColor(category?.color);

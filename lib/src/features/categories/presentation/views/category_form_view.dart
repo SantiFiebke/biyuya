@@ -1,24 +1,15 @@
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
+import 'package:biyuya/src/core/presentation/widgets/color_picker_row.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-const _presetColors = [
-  '#F44336',
-  '#E91E63',
-  '#9C27B0',
-  '#673AB7',
-  '#3F51B5',
-  '#2196F3',
-  '#4CAF50',
-  '#FF9800',
-  '#795548',
-  '#607D8B',
-];
+export 'package:biyuya/src/core/presentation/widgets/color_picker_row.dart'
+    show ColorPickerRow;
 
 const _presetIcons = <IconData>[
   Icons.shopping_cart,
@@ -136,10 +127,25 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
                 validator: FormValidators.categoryName,
               ),
               const SizedBox(height: 24),
+              Text('Color', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
               ColorPickerRow(
-                selectedColor: _selectedColor,
-                onColorSelected: (color) =>
-                    setState(() => _selectedColor = color),
+                colors: presetCategoryColors
+                    .map(parseCategoryColor)
+                    .whereType<Color>()
+                    .toList(),
+                selectedColor: parseCategoryColor(_selectedColor),
+                onSelected: (color) {
+                  final hex = presetCategoryColors.firstWhere(
+                    (h) => parseCategoryColor(h) == color,
+                  );
+                  setState(
+                    () => _selectedColor =
+                        parseCategoryColor(_selectedColor) == color
+                        ? null
+                        : hex,
+                  );
+                },
               ),
               const SizedBox(height: 24),
               IconPickerGrid(
@@ -165,79 +171,6 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class ColorPickerRow extends StatelessWidget {
-  const ColorPickerRow({
-    required this.selectedColor,
-    required this.onColorSelected,
-    super.key,
-  });
-
-  final String? selectedColor;
-  final ValueChanged<String?> onColorSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final parsedSelected = parseCategoryColor(selectedColor);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Color', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final hex in _presetColors)
-              _ColorCircle(
-                color: parseCategoryColor(hex)!,
-                isSelected: parsedSelected == parseCategoryColor(hex),
-                onTap: () => onColorSelected(
-                  parsedSelected == parseCategoryColor(hex) ? null : hex,
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ColorCircle extends StatelessWidget {
-  const _ColorCircle({
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: isSelected
-              ? Border.all(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  width: 3,
-                )
-              : null,
-        ),
-        child: isSelected
-            ? const Icon(Icons.check, color: Colors.white, size: 20)
-            : null,
       ),
     );
   }

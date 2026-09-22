@@ -49,7 +49,6 @@ class _DeleteHouseholdDialogState extends State<_DeleteHouseholdDialog> {
             controller: _controller,
             autofocus: true,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(border: OutlineInputBorder()),
           ),
         ],
       ),

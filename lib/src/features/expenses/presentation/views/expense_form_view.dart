@@ -1,13 +1,16 @@
+import 'dart:async';
+
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/category_dropdown.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/create_category_bottom_sheet.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ExpenseFormView extends ConsumerStatefulWidget {
@@ -51,8 +54,6 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
     _descriptionController.dispose();
     super.dispose();
   }
-
-  String get _formattedDate => DateFormat('dd/MM/yyyy').format(_selectedDate);
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -108,6 +109,8 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Editar gasto' : 'Nuevo gasto'),
@@ -116,32 +119,26 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
           onPressed: () => context.go(AppRoute.home.path),
         ),
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextFormField(
-                    controller: _amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Monto',
-                      hintText: '0.00',
-                      prefixIcon: Icon(Icons.attach_money),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [CurrencyTextInputFormatter()],
-                    autofocus: true,
-                    enabled: !_saving,
-                    validator: FormValidators.amount,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Hero: monto centrado ──
+              _AmountHero(controller: _amountController, saving: _saving),
+              const SizedBox(height: 12),
+
+              // ── Categoría ──
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 4,
                   ),
-                  const SizedBox(height: 24),
-                  CategoryDropdown(
+                  child: CategoryDropdown(
                     selectedCategoryId: _selectedCategoryId,
                     enabled: !_saving,
                     onChanged: (id) async {
@@ -149,29 +146,47 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                         setState(() => _selectedCategoryId = id);
                         return;
                       }
-
                       final newId = await showCreateCategorySheet(context, ref);
                       setState(() => _selectedCategoryId = newId);
                     },
                   ),
-                  const SizedBox(height: 24),
-                  _DateField(
-                    formattedDate: _formattedDate,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Fecha ──
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 4,
+                  ),
+                  child: _DateField(
+                    formattedDate: formatHumanDate(_selectedDate),
                     enabled: !_saving,
                     onTap: _pickDate,
                   ),
-                  const SizedBox(height: 24),
-                  TextFormField(
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Descripción ──
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 4,
+                  ),
+                  child: TextFormField(
                     controller: _descriptionController,
                     decoration: InputDecoration(
                       labelText: 'Descripción (opcional)',
                       hintText: 'Ej: Compra en el supermercado, etc.',
-                      hintStyle: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     maxLines: 3,
                     maxLength: FormValidators.descriptionMaxLength,
@@ -179,34 +194,103 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                     enabled: !_saving,
                     validator: FormValidators.description,
                   ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: _saving ? null : _submit,
-                    child: _saving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Guardar'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: _saving
-                        ? null
-                        : () => context.go(AppRoute.home.path),
-                    child: const Text('Cancelar'),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 32),
+
+              // ── CTA ──
+              ElevatedButton(
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        unawaited(HapticFeedback.mediumImpact());
+                        await _submit();
+                      },
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Guardar gasto'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _saving
+                    ? null
+                    : () => context.go(AppRoute.home.path),
+                child: const Text('Cancelar'),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// Sub-widgets extraídos (dumb, StatelessWidget)
+// ---------------------------------------------------------------------------
+
+/// Sección hero: monto grande centrado con prefijo `$`.
+class _AmountHero extends StatelessWidget {
+  const _AmountHero({required this.controller, required this.saving});
+
+  final TextEditingController controller;
+  final bool saving;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+        child: Column(
+          children: [
+            Text(
+              'Monto',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: controller,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.attach_money),
+                hintText: '0,00',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                filled: false,
+                errorMaxLines: 2,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [CurrencyTextInputFormatter()],
+              autofocus: true,
+              enabled: !saving,
+              validator: FormValidators.amount,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Campo de fecha con display humanizado.
 class _DateField extends StatelessWidget {
   const _DateField({
     required this.formattedDate,
@@ -221,12 +305,13 @@ class _DateField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      key: ValueKey(formattedDate),
+      initialValue: formattedDate,
       readOnly: true,
       decoration: const InputDecoration(
         labelText: 'Fecha',
         prefixIcon: Icon(Icons.calendar_today),
       ),
-      controller: TextEditingController(text: formattedDate),
       enabled: enabled,
       onTap: enabled ? onTap : null,
     );

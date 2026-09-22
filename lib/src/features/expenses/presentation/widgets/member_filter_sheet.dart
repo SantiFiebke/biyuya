@@ -10,6 +10,11 @@ Future<String?> showMemberFilterSheet(
 }) {
   return showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    clipBehavior: Clip.antiAlias,
     builder: (context) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,

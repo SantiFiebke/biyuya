@@ -5,7 +5,6 @@ import 'package:biyuya/src/features/reports/presentation/views/report_view.dart'
 import 'package:biyuya/src/features/reports/presentation/widgets/category_expenses_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 const _testBreakdown = CategoryBreakdown(
@@ -59,17 +58,11 @@ void main() {
   group('CategoryBreakdownTile', () {
     testWidgets('calls onTap when tapped', (tester) async {
       var tapped = false;
-      final amountFormat = NumberFormat.currency(
-        locale: 'es_AR',
-        symbol: r'$',
-        decimalDigits: 0,
-      );
 
       await tester.pumpWidget(
         wrap(
           CategoryBreakdownTile(
             breakdown: _testBreakdown,
-            amountFormat: amountFormat,
             onTap: () => tapped = true,
           ),
         ),

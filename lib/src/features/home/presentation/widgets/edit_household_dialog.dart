@@ -13,10 +13,7 @@ Future<void> showEditHouseholdDialog(BuildContext context, WidgetRef ref) {
       title: const Text('Editar nombre del hogar'),
       content: TextField(
         controller: controller,
-        decoration: const InputDecoration(
-          labelText: 'Nombre',
-          border: OutlineInputBorder(),
-        ),
+        decoration: const InputDecoration(labelText: 'Nombre'),
         autofocus: true,
         textCapitalization: TextCapitalization.words,
       ),
@@ -25,7 +22,7 @@ Future<void> showEditHouseholdDialog(BuildContext context, WidgetRef ref) {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancelar'),
         ),
-        TextButton(
+        FilledButton(
           onPressed: () async {
             final name = controller.text.trim();
             if (name.isEmpty) {

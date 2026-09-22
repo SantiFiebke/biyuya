@@ -173,7 +173,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Nuevo gasto'), findsOneWidget);
-      expect(find.text('Guardar'), findsOneWidget);
+      expect(find.text('Guardar gasto'), findsOneWidget);
       expect(find.text('Cancelar'), findsOneWidget);
     });
 
@@ -187,7 +187,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Editar gasto'), findsOneWidget);
-      expect(find.text('Guardar'), findsOneWidget);
+      expect(find.text('Guardar gasto'), findsOneWidget);
     });
 
     testWidgets('pre-fills amount in edit mode', (tester) async {
@@ -211,8 +211,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar gasto'));
+      await tester.tap(find.text('Guardar gasto'));
       await tester.pumpAndSettle();
 
       expect(find.text('Ingresá un monto'), findsOneWidget);
@@ -328,8 +328,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).first, '0');
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar gasto'));
+      await tester.tap(find.text('Guardar gasto'));
       await tester.pumpAndSettle();
 
       expect(find.text('El monto debe ser mayor a 0'), findsOneWidget);
@@ -342,8 +342,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).first, '1234,56');
-      await tester.ensureVisible(find.text('Guardar'));
-      await tester.tap(find.text('Guardar'));
+      await tester.ensureVisible(find.text('Guardar gasto'));
+      await tester.tap(find.text('Guardar gasto'));
       await tester.pumpAndSettle();
 
       expect(find.text('Ingresá un monto'), findsNothing);
