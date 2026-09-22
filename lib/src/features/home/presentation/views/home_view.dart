@@ -4,7 +4,8 @@ import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/core/presentation/widgets/category_avatar.dart';
-import 'package:biyuya/src/core/presentation/widgets/empty_state.dart';
+import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
+import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
@@ -33,16 +34,7 @@ class HomeView extends ConsumerWidget {
     final categories = ref.watch(categoryControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cuentas claras'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.category_outlined),
-            tooltip: 'Categorías',
-            onPressed: () => context.push(AppRoute.categories.path),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Cuentas claras')),
       body: session.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Error: $error')),
@@ -55,16 +47,10 @@ class HomeView extends ConsumerWidget {
             household: household,
             categories: categories.value ?? [],
             onEditHousehold: () => showEditHouseholdDialog(context, ref),
+            onRetryExpenses: () =>
+                ref.invalidate(expenseControllerProvider, asReload: true),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: null,
-        onPressed: () {
-          unawaited(HapticFeedback.lightImpact());
-          unawaited(context.push(AppRoute.expenseNew.path));
-        },
-        child: const Icon(Icons.add),
       ),
     );
   }
@@ -79,12 +65,14 @@ class _HomeContent extends StatelessWidget {
     required this.household,
     required this.categories,
     required this.onEditHousehold,
+    required this.onRetryExpenses,
   });
 
   final AsyncValue<List<Expense>> expenses;
   final AsyncValue<HouseholdData?> household;
   final List<Category> categories;
   final VoidCallback onEditHousehold;
+  final VoidCallback onRetryExpenses;
 
   @override
   Widget build(BuildContext context) {
@@ -111,15 +99,18 @@ class _HomeContent extends StatelessWidget {
         const SliverToBoxAdapter(child: _SectionHeader()),
         // 4. Expense list / empty / skeleton
         expenses.when(
-          loading: () => const SliverFillRemaining(child: _HomeSkeleton()),
-          error: (_, _) => const SliverFillRemaining(
-            child: Center(child: Text('Error al cargar gastos')),
+          loading: () => const SliverToBoxAdapter(child: _HomeSkeleton()),
+          error: (_, _) => SliverToBoxAdapter(
+            child: ErrorView(
+              message: 'No se pudieron cargar los gastos',
+              retryLabel: 'Reintentar',
+              onRetry: onRetryExpenses,
+            ),
           ),
           data: (list) {
             if (list.isEmpty) {
-              return SliverFillRemaining(
-                child: EmptyState(
-                  icon: Icons.receipt_long_outlined,
+              return SliverToBoxAdapter(
+                child: EmptyView(
                   title: 'Todavía no hay gastos',
                   message: 'Registrá tu primer gasto para empezar',
                   actionLabel: 'Registrar gasto',
@@ -383,7 +374,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -455,20 +446,6 @@ class _HomeSkeleton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           children: [
-            // Fake card
-            const SizedBox(height: 8),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Container(
-                height: 140,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
             // Fake list tiles
             ...List.generate(
               4,

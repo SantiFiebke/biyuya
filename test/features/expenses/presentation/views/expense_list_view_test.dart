@@ -1,5 +1,4 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
-import 'package:biyuya/src/core/presentation/widgets/empty_state.dart';
 import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
@@ -185,7 +184,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(EmptyState), findsOneWidget);
       expect(find.text('No hay gastos'), findsOneWidget);
       expect(find.text('Registrar gasto'), findsOneWidget);
     });

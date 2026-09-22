@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
+import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
+import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
@@ -46,15 +48,17 @@ class ReportView extends ConsumerWidget {
       appBar: AppBar(title: const Text('Reportes')),
       body: asyncReport.when(
         loading: () => const ReportSkeleton(),
-        error: (error, _) => Center(
-          child: Text(
-            'Error al cargar reporte',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+        error: (_, _) => ErrorView(
+          message: 'No se pudo cargar el reporte',
+          retryLabel: 'Reintentar',
+          onRetry: () => ref.invalidate(reportControllerProvider),
         ),
         data: (report) {
           if (report == null) {
-            return const Center(child: Text('No hay datos para este mes'));
+            return const EmptyView(
+              title: 'No hay datos para este mes',
+              message: 'Registrá gastos para ver tu reporte',
+            );
           }
           return ReportContent(
             report: report,
@@ -115,11 +119,9 @@ class ReportContent extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (report.categoryBreakdowns.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text('No hay gastos este mes'),
-              ),
+            const EmptyView(
+              title: 'No hay gastos este mes',
+              message: 'Registrá gastos para ver el desglose por categoría',
             )
           else
             ...report.categoryBreakdowns.map(

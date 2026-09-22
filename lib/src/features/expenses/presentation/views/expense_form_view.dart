@@ -129,13 +129,14 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                     controller: _amountController,
                     decoration: const InputDecoration(
                       labelText: 'Monto',
-                      prefixText: r'\$ ',
+                      hintText: '0.00',
                       prefixIcon: Icon(Icons.attach_money),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    inputFormatters: const [DecimalTextInputFormatter()],
+                    inputFormatters: [CurrencyTextInputFormatter()],
+                    autofocus: true,
                     enabled: !_saving,
                     validator: FormValidators.amount,
                   ),
@@ -144,17 +145,13 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                     selectedCategoryId: _selectedCategoryId,
                     enabled: !_saving,
                     onChanged: (id) async {
-                      if (id == -1) {
-                        final newId = await showCreateCategorySheet(
-                          context,
-                          ref,
-                        );
-                        if (newId != null) {
-                          setState(() => _selectedCategoryId = newId);
-                        }
-                      } else {
+                      if (id != -1) {
                         setState(() => _selectedCategoryId = id);
+                        return;
                       }
+
+                      final newId = await showCreateCategorySheet(context, ref);
+                      setState(() => _selectedCategoryId = newId);
                     },
                   ),
                   const SizedBox(height: 24),
@@ -166,9 +163,15 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
                   const SizedBox(height: 24),
                   TextFormField(
                     controller: _descriptionController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Descripción (opcional)',
-                      prefixIcon: Icon(Icons.notes),
+                      hintText: 'Ej: Compra en el supermercado, etc.',
+                      hintStyle: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                     maxLines: 3,
                     maxLength: FormValidators.descriptionMaxLength,

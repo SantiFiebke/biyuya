@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:biyuya/src/core/core.dart';
+import 'package:biyuya/src/core/provider/theme_provider.dart';
 import 'package:biyuya/src/navigation/provider/router_provider.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
@@ -42,6 +43,10 @@ class _MyAppState extends ConsumerState<MyApp> {
   void initState() {
     super.initState();
     unawaited(_initDeepLinks());
+    // Load persisted theme preference (default: light)
+    unawaited(
+      Future.microtask(() => ref.read(themeProvider.notifier).loadSaved()),
+    );
   }
 
   @override
@@ -86,7 +91,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = View.of(context).platformDispatcher.platformBrightness;
+    final themeMode = ref.watch(themeProvider);
 
     final textTheme = createTextTheme(context, 'Inter', 'Roboto');
 
@@ -95,7 +100,9 @@ class _MyAppState extends ConsumerState<MyApp> {
     return MaterialApp.router(
       title: 'Cuentas claras',
       debugShowCheckedModeBanner: false,
-      theme: brightness == Brightness.light ? theme.light() : theme.dark(),
+      theme: theme.light(),
+      darkTheme: theme.dark(),
+      themeMode: themeMode.isDark ? ThemeMode.dark : ThemeMode.light,
       routerConfig: ref.watch(routerProvider),
       localizationsDelegates: const [
         ...GlobalCupertinoLocalizations.delegates,

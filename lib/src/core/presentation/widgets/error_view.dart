@@ -1,45 +1,31 @@
 import 'package:material_ui/material_ui.dart';
 
-/// Estado vacío con ícono, texto y acción opcional.
-class EmptyState extends StatelessWidget {
-  const EmptyState({
-    required this.icon,
-    required this.title,
+/// Error state with illustration, title, optional message and retry button.
+class ErrorView extends StatelessWidget {
+  const ErrorView({
+    this.title = 'Algo salió mal',
     this.message,
-    this.actionLabel,
-    this.onAction,
+    this.retryLabel,
+    this.onRetry,
     super.key,
   });
 
-  final IconData icon;
   final String title;
   final String? message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
+  final String? retryLabel;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 20),
+            Image.asset('images/confused_error_image.jpeg', height: 180),
+            const SizedBox(height: 16),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -57,9 +43,9 @@ class EmptyState extends StatelessWidget {
                 ),
               ),
             ],
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 24),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+            if (retryLabel != null && onRetry != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(onPressed: onRetry, child: Text(retryLabel!)),
             ],
           ],
         ),

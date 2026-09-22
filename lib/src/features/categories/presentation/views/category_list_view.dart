@@ -1,6 +1,8 @@
 import 'package:biyuya/src/core/presentation/dialogs/confirm_action_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
+import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
+import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
@@ -31,15 +33,17 @@ class CategoryListView extends ConsumerWidget {
       appBar: AppBar(title: const Text('Categorías')),
       body: asyncCategories.when(
         loading: () => const _CategorySkeleton(),
-        error: (error, _) => Center(
-          child: Text(
-            'Error al cargar categorías',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
+        error: (_, _) => ErrorView(
+          message: 'No se pudieron cargar las categorías',
+          retryLabel: 'Reintentar',
+          onRetry: () => ref.invalidate(categoryControllerProvider),
         ),
         data: (categories) {
           if (categories.isEmpty) {
-            return const EmptyCategories();
+            return const EmptyView(
+              title: 'No hay categorías',
+              message: 'Creá categorías para organizar tus gastos',
+            );
           }
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -132,36 +136,6 @@ class CategoryTile extends StatelessWidget {
           icon: const Icon(Icons.edit_outlined),
           onPressed: onEdit,
         ),
-      ),
-    );
-  }
-}
-
-class EmptyCategories extends StatelessWidget {
-  const EmptyCategories({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.category_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No hay categorías',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Creá una para empezar.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
       ),
     );
   }

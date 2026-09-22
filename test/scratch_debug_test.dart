@@ -54,6 +54,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     debugPrint('dialog: ${find.byType(Dialog).evaluate().length}');
-    debugPrint('datePicker: ${find.byType(DateRangePickerDialog).evaluate().length}');
+    debugPrint(
+      'datePicker: ${find.byType(DateRangePickerDialog).evaluate().length}',
+    );
   });
 }

@@ -5,7 +5,8 @@ import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/core/presentation/widgets/category_avatar.dart';
-import 'package:biyuya/src/core/presentation/widgets/empty_state.dart';
+import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
+import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
 import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
@@ -112,7 +113,6 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     final asyncExpenses = ref.watch(expenseControllerProvider);
     final asyncMembers = ref.watch(householdMembersProvider);
     final members = asyncMembers.value ?? [];
-    final theme = Theme.of(context);
 
     ref.listen<AsyncValue<List<Expense>>>(expenseControllerProvider, (
       _,
@@ -164,18 +164,16 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
           Expanded(
             child: asyncExpenses.when(
               loading: () => const _ExpenseSkeleton(),
-              error: (error, _) => Center(
-                child: Text(
-                  'Error al cargar gastos',
-                  style: theme.textTheme.bodyLarge,
-                ),
+              error: (_, _) => ErrorView(
+                message: 'No se pudieron cargar los gastos',
+                retryLabel: 'Reintentar',
+                onRetry: () => ref.invalidate(expenseControllerProvider),
               ),
               data: (expenses) {
                 final filtered = _filterExpenses(expenses);
 
                 if (filtered.isEmpty) {
-                  return EmptyState(
-                    icon: Icons.receipt_long_outlined,
+                  return EmptyView(
                     title: 'No hay gastos',
                     message: 'Probá cambiar los filtros o registrá un gasto',
                     actionLabel: 'Registrar gasto',

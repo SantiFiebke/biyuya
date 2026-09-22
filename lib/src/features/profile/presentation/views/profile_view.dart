@@ -1,6 +1,7 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/dialogs/confirm_action_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
+import 'package:biyuya/src/core/provider/theme_provider.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
@@ -158,11 +159,11 @@ class _HouseholdInfoCard extends StatelessWidget {
   }
 }
 
-class _MenuItems extends StatelessWidget {
+class _MenuItems extends ConsumerWidget {
   const _MenuItems();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Card(
       child: Column(
         children: [
@@ -172,6 +173,14 @@ class _MenuItems extends StatelessWidget {
             subtitle: const Text('Gestionar categorías de gastos'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoute.categories.path),
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.dark_mode_outlined),
+            title: const Text('Modo oscuro'),
+            subtitle: const Text('Cambiar tema de la app'),
+            value: ref.watch(themeProvider).isDark,
+            onChanged: (_) => ref.read(themeProvider.notifier).toggle(),
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 /// Validadores y formatters centralizados para formularios.
 class FormValidators {
@@ -181,5 +182,66 @@ class DecimalTextInputFormatter extends TextInputFormatter {
       '^\\d{0,$maxIntegerDigits}([.,]\\d{0,$decimalRange})?\$',
     );
     return regex.hasMatch(text) ? newValue : oldValue;
+  }
+}
+
+/// Formatea el input con separadores de miles según locale.
+/// Permite dígitos y un separador decimal (coma o punto).
+/// Cursor se reposiciona al final tras formatear.
+class CurrencyTextInputFormatter extends TextInputFormatter {
+  CurrencyTextInputFormatter({this.locale = 'es_AR', this.decimalDigits = 2})
+    : _formatter = NumberFormat.decimalPattern(locale);
+
+  final String locale;
+  final int decimalDigits;
+  final NumberFormat _formatter;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) {
+      return newValue;
+    }
+
+    // Strip non-numeric chars except comma/period
+    final stripped = text.replaceAll(RegExp(r'[^\d,.]'), '');
+    if (stripped.isEmpty) {
+      return TextEditingValue.empty;
+    }
+
+    // Check if user is actively typing a decimal separator
+    final endsWithSep = stripped.endsWith('.') || stripped.endsWith(',');
+
+    // Normalize comma → period for parsing
+    final normalized = stripped.replaceAll(',', '.');
+    final value = double.tryParse(normalized);
+
+    // User just typed separator — show integer part + comma
+    if (endsWithSep && value == null) {
+      final intPart = normalized.split('.').first;
+      final parsed = int.tryParse(intPart);
+      if (parsed == null) {
+        return oldValue;
+      }
+      final formatted = _formatter.format(parsed);
+      final newText = '$formatted,';
+      return TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
+    }
+
+    if (value == null) {
+      return oldValue;
+    }
+
+    final formatted = _formatter.format(value);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }

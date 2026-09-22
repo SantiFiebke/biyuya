@@ -106,6 +106,10 @@ Future<int?> showCreateCategorySheet(
                     }
                   }
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ),
                 child: const Text('Crear'),
               ),
               const SizedBox(height: 16),

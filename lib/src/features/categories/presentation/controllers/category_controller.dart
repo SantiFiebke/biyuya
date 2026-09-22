@@ -48,8 +48,6 @@ class CategoryController extends _$CategoryController {
 
     final previous = state.value ?? [];
 
-    state = const AsyncLoading();
-
     final repository = ref.read(categoryRepositoryProvider);
 
     final result = await repository.createCategory(
@@ -79,8 +77,6 @@ class CategoryController extends _$CategoryController {
     String? icon,
   }) async {
     final previous = state.value ?? [];
-
-    state = const AsyncLoading();
 
     final repository = ref.read(categoryRepositoryProvider);
 
@@ -129,8 +125,6 @@ class CategoryController extends _$CategoryController {
 
   Future<bool> deleteCategory({required int id}) async {
     final previous = state.value ?? [];
-
-    state = const AsyncLoading();
 
     final repository = ref.read(categoryRepositoryProvider);
 

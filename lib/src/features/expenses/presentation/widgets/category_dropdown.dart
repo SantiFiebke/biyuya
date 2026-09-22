@@ -44,6 +44,7 @@ class CategoryDropdown extends ConsumerWidget {
         decoration: const InputDecoration(
           labelText: 'Categoría',
           prefixIcon: Icon(Icons.category_outlined),
+          hintText: 'Seleccionar categoría',
         ),
         items: [
           ...categories.map(_buildItem),
