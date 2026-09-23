@@ -2,17 +2,26 @@ import 'dart:async';
 
 import 'package:biyuya/src/core/data/models/user_profile_model.dart';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
+import 'package:biyuya/src/core/network/network_timeout.dart';
+import 'package:biyuya/src/features/auth/data/local/profile_cache.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household.dart';
 import 'package:biyuya/src/features/auth/domain/models/household_model.dart';
 import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_base.dart';
 import 'package:biyuya/src/features/categories/data/default_categories.dart';
+import 'package:biyuya/src/features/categories/data/local/category_cache.dart';
 import 'package:multiple_result/multiple_result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class AuthRepositoryImpl implements AuthRepositoryBase {
-  const AuthRepositoryImpl(this._client);
+  const AuthRepositoryImpl(
+    this._client,
+    this._profileCache,
+    this._categoryCache,
+  );
 
   final supabase.SupabaseClient _client;
+  final ProfileCache _profileCache;
+  final CategoryCache _categoryCache;
 
   @override
   Stream<UserProfile?> get onAuthStateChanged {
@@ -48,11 +57,13 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   }) async {
     try {
       // 1. Registro técnico pasando metadata de usuario a Supabase Auth
-      final response = await _client.auth.signUp(
-        email: email,
-        password: password,
-        data: {'first_name': name, 'last_name': lastName},
-      );
+      final response = await _client.auth
+          .signUp(
+            email: email,
+            password: password,
+            data: {'first_name': name, 'last_name': lastName},
+          )
+          .timeout(kNetworkTimeout);
 
       final user = response.user;
       if (user == null) {
@@ -79,10 +90,9 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     required String password,
   }) async {
     try {
-      final response = await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      final response = await _client.auth
+          .signInWithPassword(email: email, password: password)
+          .timeout(kNetworkTimeout);
 
       final user = response.user;
       if (user == null) {
@@ -104,11 +114,17 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
           .from('profiles')
           .select()
           .eq('id', userId)
-          .single();
+          .single()
+          .timeout(kNetworkTimeout);
 
       final profile = UserProfileModel.fromJson(data);
+      await _profileCache.save(profile);
       return Success(profile);
     } on Exception catch (e) {
+      final cached = await _profileCache.load();
+      if (cached != null && cached.id == userId) {
+        return Success(cached);
+      }
       return Error(AuthFailure('Error al recuperar el perfil de usuario: $e'));
     }
   }
@@ -118,13 +134,15 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     required String householdName,
   }) async {
     try {
-      final data = await _client.rpc<Map<String, dynamic>>(
-        'create_household',
-        params: <String, dynamic>{
-          'p_name': householdName,
-          'p_categories': defaultCategories.map((c) => c.toJson()).toList(),
-        },
-      );
+      final data = await _client
+          .rpc<Map<String, dynamic>>(
+            'create_household',
+            params: <String, dynamic>{
+              'p_name': householdName,
+              'p_categories': defaultCategories.map((c) => c.toJson()).toList(),
+            },
+          )
+          .timeout(kNetworkTimeout);
       return Success(HouseholdModel.fromJson(data));
     } on Exception catch (e) {
       return Error(AuthFailure('Error al crear el hogar: $e'));
@@ -136,10 +154,12 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     required String inviteCode,
   }) async {
     try {
-      final data = await _client.rpc<Map<String, dynamic>>(
-        'join_household',
-        params: <String, dynamic>{'p_invite_code': inviteCode},
-      );
+      final data = await _client
+          .rpc<Map<String, dynamic>>(
+            'join_household',
+            params: <String, dynamic>{'p_invite_code': inviteCode},
+          )
+          .timeout(kNetworkTimeout);
       return Success(UserProfileModel.fromJson(data));
     } on Exception catch (e) {
       return Error(AuthFailure('Error al unirse al hogar: $e'));
@@ -155,7 +175,8 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
           .from('profiles')
           .select('id, name, last_name, household_id')
           .eq('household_id', householdId)
-          .order('name');
+          .order('name')
+          .timeout(kNetworkTimeout);
 
       final members = data.map(UserProfileModel.fromJson).toList();
       return Success(members);
@@ -167,7 +188,10 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   @override
   Future<Result<void, AuthFailure>> signOut() async {
     try {
-      await _client.auth.signOut();
+      await _client.auth.signOut().timeout(kNetworkTimeout);
+      // Clear user-scoped caches so the next user doesn't inherit them.
+      await _profileCache.clear();
+      await _categoryCache.clear();
       return const Success(null);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al cerrar sesión: $e'));
@@ -177,7 +201,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   @override
   Future<Result<void, AuthFailure>> leaveHousehold() async {
     try {
-      await _client.rpc<void>('leave_household');
+      await _client.rpc<void>('leave_household').timeout(kNetworkTimeout);
       return const Success(null);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al salir del hogar: $e'));
@@ -187,7 +211,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   @override
   Future<Result<void, AuthFailure>> deleteHousehold() async {
     try {
-      await _client.rpc<void>('delete_household');
+      await _client.rpc<void>('delete_household').timeout(kNetworkTimeout);
       return const Success(null);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al eliminar el hogar: $e'));

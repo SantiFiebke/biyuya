@@ -34,10 +34,13 @@
 9. [📦 Build](#-build)
 10. [🔐 Variables de Entorno](#-variables-de-entorno)
 11. [📊 Base de Datos](#-base-de-datos)
-12. [🔄 Flujo de Autenticación](#-flujo-de-autenticación)
-13. [🤝 Contribuir](#-contribuir)
-14. [📄 Licencia](#-licencia)
-15. [👥 Equipo / Contacto](#-equipo--contacto)
+12. [📴 Modo Offline (outbox + sync)](#-modo-offline-outbox--sync)
+13. [🔁 Detección de duplicados](#-detección-de-duplicados)
+14. [📱 Widget nativo](#-widget-nativo)
+15. [🔄 Flujo de Autenticación](#-flujo-de-autenticación)
+16. [🤝 Contribuir](#-contribuir)
+17. [📄 Licencia](#-licencia)
+18. [👥 Equipo / Contacto](#-equipo--contacto)
 
 ---
 
@@ -184,8 +187,8 @@ class ExpenseController extends _$ExpenseController {
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
-| Flutter SDK | ^3.47.2 | Framework multiplataforma |
-| Dart SDK | ^3.13.2 | Lenguaje de programación |
+| Flutter SDK | ^3.12.2 | Framework multiplataforma |
+| Dart SDK | ^3.12.2 | Lenguaje de programación (`environment.sdk` en `pubspec.yaml`) |
 
 ### State Management
 
@@ -217,7 +220,10 @@ class ExpenseController extends _$ExpenseController {
 | flutter_native_splash | ^2.4.5 | Splash screen nativo |
 | equatable | ^2.0.7 | Comparación por valor de entidades |
 | multiple_result | ^5.1.0 | Manejo de errores con Result<T, Failure> |
-| shared_preferences | ^2.5.2 | Persistencia local ligera |
+| shared_preferences | ^2.5.2 | Persistencia local ligera y outbox offline |
+| connectivity_plus | ^7.0.0 | Detección de conectividad para sync |
+| uuid | ^4.6.0 | Generación de `client_id` (uuid v4) |
+| app_links | ^7.0.0 | Deep links (`biyuya://expense/new`) |
 | logger | ^2.2.0 | Logging en desarrollo |
 
 ### Testing & Quality
@@ -228,6 +234,7 @@ class ExpenseController extends _$ExpenseController {
 | very_good_analysis | ^11.0.0 | Reglas estrictas de análisis estático |
 | flutter_lints | ^6.0.0 | Reglas base de lint |
 | mocktail | ^1.0.4 | Mocking para tests |
+| fake_async | ^1.3.3 | Control de tiempos/async en tests |
 | flutter_test | SDK | Testing framework nativo |
 
 ---
@@ -294,8 +301,8 @@ lib/
 
 ### Prerrequisitos
 
-- **Flutter SDK** >= 3.47.2 ([instalación](https://docs.flutter.dev/get-started/install))
-- **Dart SDK** >= 3.13.2
+- **Flutter SDK** >= 3.12.2 ([instalación](https://docs.flutter.dev/get-started/install))
+- **Dart SDK** >= 3.12.2
 - **Cuenta en Supabase** ([supabase.com](https://supabase.com))
 - **Android Studio / Xcode** para emuladores
 
@@ -314,7 +321,7 @@ flutter pub get
 
 ### Paso 3 — Configurar variables de entorno
 
-Crear el archivo `.env` en la raíz del proyecto (ver [Variables de Entorno](#-variables-de-entorno)).
+Las credenciales se pasan con `--dart-define` al ejecutar la app (no hay archivo `.env`). Ver [Variables de Entorno](#-variables-de-entorno).
 
 ### Paso 4 — Ejecutar code generation
 
@@ -325,7 +332,9 @@ dart run build_runner build
 ### Paso 5 — Ejecutar la app
 
 ```bash
-flutter run
+flutter run \
+  --dart-define=SUPABASE_URL=https://TU-Proyecto.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=tu-anon-key-aqui
 ```
 
 ---
@@ -373,6 +382,9 @@ dart format .
 
 ```bash
 flutter test
+
+# Salida compacta (una línea por test)
+flutter test --reporter compact
 ```
 
 ### Ejecutar tests con cobertura
@@ -384,11 +396,9 @@ flutter test --coverage
 
 ### Estado Actual
 
-> ⚠️ **El directorio `test/` existe pero se encuentra vacío.** Se recomienda agregar tests unitarios para:
-> - Repositorios (con `mocktail` para Supabase client)
-> - Controllers/providers
-> - Utilidades y helpers
-> - Widgets críticos (login, formulario de gastos)
+> ✅ **Suite activa:** 37 archivos de test que pasan **304 tests** con `flutter test`.
+>
+> La carpeta `test/` espeja `lib/src/`. Convenciones, mocks con `mocktail` y patrones de `ProviderContainer` / overrides de Riverpod están documentados en **[`test/README.md`](test/README.md)**.
 
 ### Mocking
 
@@ -428,29 +438,41 @@ flutter build ios --release
 
 ## 🔐 Variables de Entorno
 
-### Archivo `.env` (raíz del proyecto)
+Las variables se inyectan **en tiempo de compilación** con `--dart-define` (`String.fromEnvironment`) y se leen desde `EnvironmentConfig` (`lib/src/core/config/enviroment_config.dart`).
 
-```env
-SUPABASE_URL=https://TU-Proyecto.supabase.co
-SUPABASE_ANON_KEY=tu-anon-key-aqui
+### Definir las variables
+
+Pasar `SUPABASE_URL` y `SUPABASE_ANON_KEY` al ejecutar o compilar:
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://TU-Proyecto.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=tu-anon-key-aqui
 ```
 
-> ⚠️ **Nunca commitear** el archivo `.env`. Ya está en `.gitignore`.
+> ⚠️ **No se usa `dotenv` ni archivos `.env`.** Al ser `String.fromEnvironment`, los valores quedan embebidos en el binario. Para builds, repetir los `--dart-define`:
 
-### Configuración en la App
+```bash
+flutter build apk --release \
+  --dart-define=SUPABASE_URL=... \
+  --dart-define=SUPABASE_ANON_KEY=...
+```
 
-Las variables se leen en `lib/src/core/config/` y se inyectan al inicializar Supabase en `main.dart`:
+### Validación en la App
+
+`EnvironmentConfig.validate()` corre al inicio de `main.dart` y lanza excepción si falta alguna variable:
 
 ```dart
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+// lib/src/core/config/enviroment_config.dart
+class EnvironmentConfig {
+  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
-    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
-  );
-
-  runApp(const ProviderScope(child: BiyuyaApp()));
+  static void validate() {
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      throw Exception('Faltan variables de entorno esenciales.');
+    }
+  }
 }
 ```
 
@@ -469,6 +491,30 @@ void main() async {
 ### Modelo de Datos (Supabase)
 
 El backend utiliza **Supabase PostgreSQL** con las siguientes tablas:
+
+### Migraciones
+
+Los cambios de esquema viven en `supabase/migrations/`:
+
+| Migración | Contenido |
+|---|---|
+| `20260918203245_remote_schema.sql` | Esquema remoto inicial |
+| `20260918211000_add_performance_indexes.sql` | Índices de rendimiento |
+| `20260918212000_add_profiles_household_index.sql` | Índice de `profiles.household_id` |
+| `20260918213000_create_household_rpc.sql` | RPC para crear hogar |
+| `20260918214000_join_household_rpc.sql` | RPC para unirse a un hogar |
+| `20260918215000_add_input_constraints.sql` | Constraints de entrada |
+| `20260918216000_household_ownership.sql` | Propiedad del hogar |
+| `20260922000000_add_category_budget.sql` | Presupuesto por categoría |
+| `20260923000000_add_expense_client_id.sql` | `client_id` para idempotencia offline |
+
+Aplicar al proyecto remoto:
+
+```bash
+supabase db push
+```
+
+> ⚠️ `20260922000000_add_category_budget.sql` y `20260923000000_add_expense_client_id.sql` **deben aplicarse** o la app falla en runtime: el presupuesto por categoría y la idempotencia del modo offline dependen de esas columnas.
 
 ---
 
@@ -550,6 +596,34 @@ El backend utiliza **Supabase PostgreSQL** con las siguientes tablas:
               │ last_modified_at │
               └─────────────┘
 ```
+
+---
+
+## 📴 Modo Offline (outbox + sync)
+
+La app permite registrar gastos sin conexión y sincronizarlos luego.
+
+- **Outbox local:** los gastos creados sin red se guardan en `PendingExpenseStore` (`shared_preferences`) y se muestran de forma **optimista** con el badge **"pendiente"**.
+- **Idempotencia:** cada gasto pendiente lleva un `client_id` (uuid v4). Al sincronizar se hace `upsert` con `onConflict: 'client_id'`, así los reintentos no generan filas duplicadas.
+- **Disparadores de sync:** al recuperar conectividad (`connectivity_plus`), al reanudar la app y con el botón manual **"Reintentar sync"**.
+- **`ExpenseSyncService.flush()`** vacía la outbox; tiene guard de **re-entrancy** (si ya hay un flush en curso, no arranca otro).
+- **Arranque offline:** se cachean categorías y perfil para no depender de la red al iniciar.
+- **Timeouts:** las llamadas de red usan `kNetworkTimeout` (5 s) y caen a la caché si no responden.
+- El total del **widget nativo** incluye los gastos pendientes.
+
+---
+
+## 🔁 Detección de duplicados
+
+Detector *content-only* `findDuplicateExpenseIds`: agrupa los gastos por la clave `householdId|amount|día|categoryId|description normalizada` (**sin `user_uuid`**, para detectar duplicados aunque los cargue otro miembro). Los gastos repetidos se marcan con el badge **"posible duplicado"** en la lista y en el home; la marca es informativa y **no bloquea** el registro.
+
+---
+
+## 📱 Widget nativo
+
+- **Android:** `ExpenseWidget` (`AppWidgetProvider`) muestra el total gastado hoy. Se alimenta de `SharedPreferences` y de un `MethodChannel` (`biyuya/widget`).
+- **Refresco:** on-demand desde la app y por `updatePeriodMillis` (24 h). El reset a medianoche es pasivo: al leer, compara la fecha y descarta el total de ayer.
+- **iOS:** **no tiene widget** — no existe extensión WidgetKit en el proyecto.
 
 ---
 

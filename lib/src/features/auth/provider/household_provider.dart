@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/network/network_timeout.dart';
 import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
@@ -22,7 +23,8 @@ class HouseholdName extends _$HouseholdName {
           .from('households')
           .select('name, invite_code')
           .eq('id', int.parse(householdId))
-          .single();
+          .single()
+          .timeout(kNetworkTimeout);
 
       return HouseholdData(
         name: data['name'] as String,
@@ -45,7 +47,8 @@ class HouseholdName extends _$HouseholdName {
     await client
         .from('households')
         .update({'name': newName})
-        .eq('id', int.parse(householdId));
+        .eq('id', int.parse(householdId))
+        .timeout(kNetworkTimeout);
 
     ref.invalidateSelf();
   }

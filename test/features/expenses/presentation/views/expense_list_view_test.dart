@@ -1,4 +1,7 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
+import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
+import 'package:biyuya/src/core/presentation/widgets/duplicate_warning_badge.dart';
+import 'package:biyuya/src/core/presentation/widgets/pending_badge.dart';
 import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
@@ -129,8 +132,15 @@ void main() {
 
       // BottomSheet should show all categories + "all" option
       expect(find.text('Todas las categorías'), findsOneWidget);
-      expect(find.text('Food'), findsOneWidget);
-      expect(find.text('Transport'), findsOneWidget);
+      final sheet = find.byType(BottomSheet);
+      expect(
+        find.descendant(of: sheet, matching: find.text('Food')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.text('Transport')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tapping date filter opens date range picker', (tester) async {
@@ -545,6 +555,288 @@ void main() {
 
       expect(fake.deletedIds, isEmpty);
       expect(find.text('Groceries'), findsOneWidget);
+    });
+  });
+
+  group('Pending sync UI', () {
+    final syncedExpense = Expense(
+      id: 1,
+      amount: 200,
+      date: DateTime(2025, 7, 10),
+      description: 'Synced',
+      householdId: 1,
+      categoryId: 1,
+      userUuid: 'user-1',
+      createdAt: DateTime(2025, 7, 10),
+    );
+    final pendingExpense = Expense(
+      id: 2,
+      amount: 50,
+      date: DateTime(2025, 7, 12),
+      description: 'Pending',
+      householdId: 1,
+      categoryId: 2,
+      userUuid: 'user-1',
+      clientId: 'client-2',
+      syncStatus: ExpenseSyncStatus.pending,
+      createdAt: DateTime(2025, 7, 12),
+    );
+
+    List<Override> overrides(List<Expense> expenses) => [
+      categoryControllerProvider.overrideWithValue(
+        AsyncData<List<Category>>(_testCategories),
+      ),
+      expenseControllerProvider.overrideWithValue(
+        AsyncData<List<Expense>>(expenses),
+      ),
+    ];
+
+    testWidgets('shows PendingBadge only for the non-synced expense', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: overrides([syncedExpense, pendingExpense]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PendingBadge), findsOneWidget);
+      expect(find.text('pendiente'), findsOneWidget);
+    });
+
+    testWidgets('shows no PendingBadge when all expenses are synced', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: overrides([syncedExpense]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PendingBadge), findsNothing);
+      expect(find.text('pendiente'), findsNothing);
+    });
+
+    testWidgets('shows "Reintentar sync" when a pending expense exists', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: overrides([syncedExpense, pendingExpense]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reintentar sync'), findsOneWidget);
+    });
+
+    testWidgets('hides "Reintentar sync" when all expenses are synced', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: overrides([syncedExpense]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reintentar sync'), findsNothing);
+    });
+  });
+
+  group('ExpenseListTile small-screen layout regression', () {
+    final worstCaseExpense = Expense(
+      id: 99,
+      amount: 1234567.89,
+      date: DateTime(2025, 7, 10),
+      description:
+          'Compra muy larga en el supermercado con descripción extensa que debe truncarse',
+      householdId: 1,
+      categoryId: 1,
+      userUuid: 'user-1',
+      clientId: 'client-99',
+      syncStatus: ExpenseSyncStatus.pending,
+      createdAt: DateTime(2025, 7, 10),
+    );
+
+    final worstCaseCategory = Category(
+      id: 1,
+      name: 'Supermercado y almacén',
+      householdId: 1,
+      createdAt: DateTime(2025),
+      color: '#4CAF50',
+      icon: '63046',
+    );
+
+    for (final width in [320.0, 360.0, 411.0]) {
+      testWidgets(
+        'does not overflow at ${width.toInt()}px with badges in subtitle',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 640);
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+
+          await tester.pumpWidget(
+            wrapTest(
+              child: ExpenseListTile(
+                expense: worstCaseExpense,
+                category: worstCaseCategory,
+                isDuplicate: true,
+                onTap: () {},
+                onDelete: () {},
+              ),
+            ),
+          );
+          await tester.pump();
+
+          expect(tester.takeException(), isNull);
+          expect(find.byType(PendingBadge), findsOneWidget);
+          expect(find.byType(DuplicateWarningBadge), findsOneWidget);
+        },
+      );
+    }
+  });
+
+  group('ExpenseListTile long category subtitle regression', () {
+    const longCategoryName =
+        'Supermercado y almacén con un nombre extremadamente largo que no cabe';
+
+    final longCategory = Category(
+      id: 1,
+      name: longCategoryName,
+      householdId: 1,
+      createdAt: DateTime(2025),
+      color: '#4CAF50',
+      icon: '63046',
+    );
+
+    final worstCaseExpense = Expense(
+      id: 99,
+      amount: 1234567.89,
+      date: DateTime(2025, 7, 10),
+      description:
+          'Compra muy larga en el supermercado con descripción extensa que debe truncarse',
+      householdId: 1,
+      categoryId: 1,
+      userUuid: 'user-1',
+      clientId: 'client-99',
+      syncStatus: ExpenseSyncStatus.pending,
+      createdAt: DateTime(2025, 7, 10),
+    );
+
+    for (final width in [320.0, 360.0]) {
+      testWidgets(
+        'keeps long category on one line and date visible at ${width.toInt()}px',
+        (tester) async {
+          tester.view.physicalSize = Size(width, 640);
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+
+          await tester.pumpWidget(
+            wrapTest(
+              child: ExpenseListTile(
+                expense: worstCaseExpense,
+                category: longCategory,
+                isDuplicate: true,
+                onTap: () {},
+                onDelete: () {},
+              ),
+            ),
+          );
+          await tester.pump();
+
+          expect(tester.takeException(), isNull);
+
+          final subtitle =
+              '$longCategoryName · ${formatHumanDate(worstCaseExpense.date)}';
+          final subtitleText = tester.widget<Text>(find.text(subtitle));
+          expect(subtitleText.maxLines, 1);
+          expect(subtitleText.overflow, TextOverflow.ellipsis);
+
+          expect(
+            tester.getSize(find.byType(ListTile).first).height,
+            lessThan(150),
+          );
+        },
+      );
+    }
+  });
+
+  group('Duplicate warning badge', () {
+    // Two content-duplicates (same amount/day/category/description) + one
+    // unique expense.
+    final duplicateA = Expense(
+      id: 1,
+      amount: 200,
+      date: DateTime(2025, 7, 10),
+      description: 'Groceries',
+      householdId: 1,
+      categoryId: 1,
+      userUuid: 'user-1',
+      createdAt: DateTime(2025, 7, 10),
+    );
+    final duplicateB = Expense(
+      id: 2,
+      amount: 200,
+      date: DateTime(2025, 7, 10),
+      description: 'Groceries',
+      householdId: 1,
+      categoryId: 1,
+      userUuid: 'user-1',
+      createdAt: DateTime(2025, 7, 10),
+    );
+    final unique = Expense(
+      id: 3,
+      amount: 50,
+      date: DateTime(2025, 7, 12),
+      description: 'Bus ticket',
+      householdId: 1,
+      categoryId: 2,
+      userUuid: 'user-1',
+      createdAt: DateTime(2025, 7, 12),
+    );
+
+    testWidgets('shows badge for duplicates only, not for unique expense', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>([duplicateA, duplicateB, unique]),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DuplicateWarningBadge), findsNWidgets(2));
+      expect(
+        find.descendant(
+          of: find.widgetWithText(ExpenseListTile, 'Groceries'),
+          matching: find.byType(DuplicateWarningBadge),
+        ),
+        findsNWidgets(2),
+      );
+      expect(
+        find.descendant(
+          of: find.widgetWithText(ExpenseListTile, 'Bus ticket'),
+          matching: find.byType(DuplicateWarningBadge),
+        ),
+        findsNothing,
+      );
     });
   });
 }

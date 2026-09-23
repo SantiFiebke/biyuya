@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/network/network_timeout.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/domain/repositories/category_repository_base.dart';
 import 'package:biyuya/src/features/expenses/domain/models/expense_model.dart';
@@ -78,7 +79,8 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
         .select()
         .eq('household_id', householdId)
         .gte('date', startDate.toIso8601String())
-        .lte('date', endDate.toIso8601String());
+        .lte('date', endDate.toIso8601String())
+        .timeout(kNetworkTimeout);
 
     return data.map(ExpenseModel.fromJson).toList();
   }

@@ -208,4 +208,65 @@ void main() {
     test('rejects letters', () => expect(apply('abc').text, isNot('abc')));
     test('accepts empty', () => expect(apply('').text, ''));
   });
+
+  group('FormValidators.formatAmountInput', () {
+    test(
+      'formats with comma decimal separator',
+      () => expect(FormValidators.formatAmountInput(150.75), '150,75'),
+    );
+  });
+
+  group('FormValidators.parseAmount es_AR separators', () {
+    test(
+      'parses grouping dot + comma decimal',
+      () => expect(FormValidators.parseAmount('1.234,56'), 1234.56),
+    );
+    test(
+      'parses grouping-only dot as thousands',
+      () => expect(FormValidators.parseAmount('1.000'), 1000.0),
+    );
+  });
+
+  group('CurrencyTextInputFormatter', () {
+    final formatter = CurrencyTextInputFormatter();
+
+    TextEditingValue apply(String text, {String old = ''}) =>
+        formatter.formatEditUpdate(
+          TextEditingValue(text: old),
+          TextEditingValue(text: text),
+        );
+
+    test('appending digit to "1.000" yields "10.000"', () {
+      expect(apply('1.0000', old: '1.000').text, '10.000');
+    });
+    test('appending digit to "1.500" yields "15.000"', () {
+      expect(apply('1.5000', old: '1.500').text, '15.000');
+    });
+    test('groups four digits', () => expect(apply('1500').text, '1.500'));
+    test(
+      'formats integer + decimal',
+      () => expect(apply('1234,56').text, '1.234,56'),
+    );
+    test(
+      'strips letters and symbols',
+      () => expect(apply('abc12x3').text, '123'),
+    );
+    test('rejects 3 decimals', () {
+      expect(apply('1.234,567', old: '1.234,56').text, '1.234,56');
+    });
+    test('rejects 9 integer digits', () {
+      expect(apply('123456789', old: '12.345.678').text, '12.345.678');
+    });
+    test('empty stays empty', () => expect(apply('').text, ''));
+    test('zero stays zero', () => expect(apply('0').text, '0'));
+    test(
+      'trailing comma preserved',
+      () => expect(apply('1.000,').text, '1.000,'),
+    );
+    test('idempotent', () {
+      final once = apply('1500').text;
+      expect(apply(once).text, once);
+      expect(once, '1.500');
+    });
+  });
 }

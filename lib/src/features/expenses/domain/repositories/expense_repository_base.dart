@@ -34,6 +34,7 @@ abstract class ExpenseRepositoryBase {
     required int categoryId,
     required String userUuid,
     String? description,
+    String? clientId,
   });
 
   /// Actualiza un gasto existente

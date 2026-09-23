@@ -8,10 +8,13 @@ import 'package:biyuya/src/features/auth/provider/household_members_provider.dar
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:logger/logger.dart';
 import 'package:multiple_result/multiple_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'auth_session_controller.g.dart';
+
+final _log = Logger(printer: PrettyPrinter(methodCount: 0));
 
 @Riverpod(keepAlive: true)
 class AuthSessionController extends _$AuthSessionController {
@@ -98,12 +101,24 @@ class AuthSessionController extends _$AuthSessionController {
       unawaited(previous.cancel());
     }
 
-    _profileSubscription = repository.onProfileChanged(userId: userId).listen((
-      userProfile,
-    ) {
-      if (userProfile != null) {
-        state = AsyncData(userProfile);
-      }
-    });
+    _profileSubscription = repository
+        .onProfileChanged(userId: userId)
+        .listen(
+          (userProfile) {
+            if (userProfile != null) {
+              state = AsyncData(userProfile);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            // Transient realtime hiccup (e.g. socket drop): keep last known state
+            // instead of tearing down the auth session.
+            _log.w(
+              'Profile realtime subscription error',
+              error: error,
+              stackTrace: stackTrace,
+            );
+          },
+          cancelOnError: false,
+        );
   }
 }

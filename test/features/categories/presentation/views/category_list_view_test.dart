@@ -134,6 +134,33 @@ void main() {
       expect(find.byIcon(Icons.edit_outlined), findsNWidgets(2));
     }, timeout: const Timeout(Duration(seconds: 30)));
 
+    testWidgets('tapping tile body invokes onEdit and keeps trailing button', (
+      tester,
+    ) async {
+      var editCalls = 0;
+
+      await tester.pumpWidget(
+        wrapTest(
+          child: CategoryTile(
+            category: _testCategories.first,
+            onEdit: () => editCalls++,
+            onDelete: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.widgetWithIcon(IconButton, Icons.edit_outlined),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byType(ListTile));
+      await tester.pump();
+
+      expect(editCalls, 1);
+    }, timeout: const Timeout(Duration(seconds: 30)));
+
     testWidgets('swipe-to-delete opens confirm dialog and records delete', (
       tester,
     ) async {

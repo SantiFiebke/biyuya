@@ -4,14 +4,17 @@ import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/core/presentation/widgets/category_avatar.dart';
+import 'package:biyuya/src/core/presentation/widgets/duplicate_warning_badge.dart';
 import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
 import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
+import 'package:biyuya/src/core/presentation/widgets/pending_badge.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/domain/utils/duplicate_detection.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/edit_household_dialog.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/invite_code_sheet.dart';
@@ -121,6 +124,8 @@ class _HomeContent extends StatelessWidget {
             final sorted = List<Expense>.from(list)
               ..sort((a, b) => b.date.compareTo(a.date));
             final top5 = sorted.take(5).toList();
+            // Computed once for the recent list, not per item.
+            final duplicateIds = findDuplicateExpenseIds(sorted);
             return SliverPadding(
               padding: const EdgeInsets.only(bottom: 80),
               sliver: SliverList.separated(
@@ -129,6 +134,7 @@ class _HomeContent extends StatelessWidget {
                 itemBuilder: (_, i) => _ExpenseItem(
                   expense: top5[i],
                   category: categoryMap[top5[i].categoryId],
+                  isDuplicate: duplicateIds.contains(top5[i].id),
                 ),
               ),
             );
@@ -378,11 +384,15 @@ class _SectionHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Últimos movimientos',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          Expanded(
+            child: Text(
+              'Últimos movimientos',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
           ),
           TextButton(
             onPressed: () => context.go(AppRoute.expenses.path),
@@ -398,19 +408,27 @@ class _SectionHeader extends StatelessWidget {
 // 4. Expense item
 // ---------------------------------------------------------------------------
 class _ExpenseItem extends StatelessWidget {
-  const _ExpenseItem({required this.expense, required this.category});
+  const _ExpenseItem({
+    required this.expense,
+    required this.category,
+    required this.isDuplicate,
+  });
 
   final Expense expense;
   final Category? category;
+  final bool isDuplicate;
 
   @override
   Widget build(BuildContext context) {
     final expenseColor = Theme.of(context).extension<AppColors>()?.expense;
+    final hasBadges =
+        isDuplicate || expense.syncStatus != ExpenseSyncStatus.synced;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        isThreeLine: hasBadges,
         leading: CategoryAvatar(
           icon: iconFromCodePoint(category?.icon),
           color: parseCategoryColor(category?.color),
@@ -420,10 +438,36 @@ class _ExpenseItem extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(
-          '${category?.name ?? ''} · ${formatHumanDate(expense.date)}',
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ponytail: single ellipsized line; long category may ellipsize the
+            // date too, acceptable — full data lives in the detail view.
+            Text(
+              '${category?.name ?? ''} · ${formatHumanDate(expense.date)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (hasBadges)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    if (isDuplicate) const DuplicateWarningBadge(),
+                    if (expense.syncStatus != ExpenseSyncStatus.synced)
+                      const PendingBadge(),
+                  ],
+                ),
+              ),
+          ],
         ),
-        trailing: AmountText(amount: expense.amount, color: expenseColor),
+        trailing: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 120),
+          child: AmountText(amount: expense.amount, color: expenseColor),
+        ),
         onTap: () => context.push(
           AppRoute.expenseDetail(expense.id.toString()),
           extra: expense,

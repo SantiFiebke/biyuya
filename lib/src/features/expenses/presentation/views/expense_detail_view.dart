@@ -1,6 +1,7 @@
 import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,18 +26,38 @@ class ExpenseDetailView extends ConsumerWidget {
       decimalDigits: 2,
     );
 
+    final isPending = expense.syncStatus != ExpenseSyncStatus.synced;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detalle del gasto'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Editar',
-            onPressed: () => context.push(
-              AppRoute.expenseEdit(expense.id.toString()),
-              extra: expense,
+          if (!isPending)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Editar',
+              onPressed: () => context.push(
+                AppRoute.expenseEdit(expense.id.toString()),
+                extra: expense,
+              ),
             ),
-          ),
+          if (isPending)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Descartar',
+              onPressed: () async {
+                final clientId = expense.clientId;
+                if (clientId == null) {
+                  return;
+                }
+                await ref
+                    .read(expenseControllerProvider.notifier)
+                    .discardPending(clientId);
+                if (context.mounted) {
+                  context.pop();
+                }
+              },
+            ),
         ],
       ),
       body: SingleChildScrollView(

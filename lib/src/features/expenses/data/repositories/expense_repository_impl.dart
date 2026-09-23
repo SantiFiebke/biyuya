@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/network/network_timeout.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/domain/models/expense_model.dart';
 import 'package:biyuya/src/features/expenses/domain/repositories/expense_repository_base.dart';
@@ -18,7 +19,8 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
           .from('expenses')
           .select('*, profiles(name)')
           .eq('household_id', householdId)
-          .order('date');
+          .order('date')
+          .timeout(kNetworkTimeout);
 
       final expenses = data.map(ExpenseModel.fromJson).toList();
       return Success(expenses);
@@ -43,7 +45,8 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
           .eq('household_id', householdId)
           .gte('date', startDate.toIso8601String())
           .lte('date', endDate.toIso8601String())
-          .order('date');
+          .order('date')
+          .timeout(kNetworkTimeout);
 
       final expenses = data.map(ExpenseModel.fromJson).toList();
       return Success(expenses);
@@ -60,20 +63,23 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
     required int categoryId,
     required String userUuid,
     String? description,
+    String? clientId,
   }) async {
     try {
       final data = await _client
           .from('expenses')
-          .insert({
+          .upsert({
             'amount': amount,
             'date': date.toIso8601String(),
             'description': description,
             'household_id': householdId,
             'category_id': categoryId,
             'user_uuid': userUuid,
-          })
+            'client_id': clientId,
+          }, onConflict: 'client_id')
           .select('*, profiles(name)')
-          .single();
+          .single()
+          .timeout(kNetworkTimeout);
 
       return Success(ExpenseModel.fromJson(data));
     } on Exception catch (e) {
@@ -101,7 +107,8 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
           })
           .eq('id', id)
           .select('*, profiles(name)')
-          .single();
+          .single()
+          .timeout(kNetworkTimeout);
 
       return Success(ExpenseModel.fromJson(data));
     } on Exception catch (e) {
@@ -112,7 +119,11 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
   @override
   Future<Result<void, ExpenseFailure>> deleteExpense({required int id}) async {
     try {
-      await _client.from('expenses').delete().eq('id', id);
+      await _client
+          .from('expenses')
+          .delete()
+          .eq('id', id)
+          .timeout(kNetworkTimeout);
       return const Success(null);
     } on Exception catch (e) {
       return Error(ExpenseFailure('Error al eliminar gasto: $e'));

@@ -106,6 +106,33 @@ class _LoadingExpenseController extends ExpenseController {
   void release() => _hold.complete();
 }
 
+/// Counts [createExpense] calls while inheriting the REAL [submitExpense]
+/// in-flight guard. Holds loading until [release] so the CTA disable is
+/// observable.
+class _CountingExpenseController extends ExpenseController {
+  int createCalls = 0;
+  final _hold = Completer<void>();
+
+  @override
+  AsyncValue<List<Expense>> build() => const AsyncData([]);
+
+  @override
+  Future<bool> createExpense({
+    required double amount,
+    required DateTime date,
+    required int categoryId,
+    String? description,
+  }) async {
+    createCalls++;
+    state = const AsyncLoading();
+    await _hold.future;
+    state = const AsyncData([]);
+    return true;
+  }
+
+  void release() => _hold.complete();
+}
+
 // Shared controller instance so tests can call release.
 late _LoadingExpenseController? _loadingCtrl;
 
@@ -202,7 +229,30 @@ void main() {
       final amountField = tester.widget<TextFormField>(
         find.byType(TextFormField).first,
       );
-      expect(amountField.controller?.text, '150.75');
+      expect(amountField.controller?.text, '150,75');
+    });
+
+    testWidgets('formats amount input live while typing', (tester) async {
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      final amountField = find.byType(TextFormField).first;
+      TextEditingController controller() =>
+          tester.widget<TextFormField>(amountField).controller!;
+
+      await tester.enterText(amountField, '1500');
+      await tester.pumpAndSettle();
+      expect(controller().text, '1.500');
+
+      await tester.enterText(amountField, '15000');
+      await tester.pumpAndSettle();
+      expect(controller().text, '15.000');
+
+      await tester.enterText(amountField, '1234,56');
+      await tester.pumpAndSettle();
+      expect(controller().text, '1.234,56');
     });
 
     testWidgets('shows validation error for empty amount', (tester) async {
@@ -368,5 +418,53 @@ void main() {
       );
       expect(field.maxLength, 200);
     });
+  });
+
+  group('ExpenseFormView - double submit guard', () {
+    testWidgets(
+      'double-tap Guardar creates once and disables CTA while submitting',
+      (tester) async {
+        final ctrl = _CountingExpenseController();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              categoryControllerProvider.overrideWithValue(
+                AsyncData<List<Category>>(_testCategories),
+              ),
+              expenseControllerProvider.overrideWith(() => ctrl),
+            ],
+            child: MaterialApp.router(
+              routerConfig: _makeTestRouter(const ExpenseFormView()),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Fill a valid form: amount + category.
+        await tester.enterText(find.byType(TextFormField).first, '100');
+        await tester.tap(find.byType(DropdownButtonFormField<int>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Food'));
+        await tester.pumpAndSettle();
+
+        // Two taps back-to-back, no pump between: the widget still shows the
+        // enabled CTA, so both taps reach the controller.
+        await tester.ensureVisible(find.text('Guardar gasto'));
+        await tester.tap(find.text('Guardar gasto'));
+        await tester.tap(find.text('Guardar gasto'));
+        await tester.pump();
+
+        // Real submitExpense guard rejected the re-entry.
+        expect(ctrl.createCalls, 1);
+
+        // CTA disabled + spinner while AsyncLoading.
+        final cta = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+        expect(cta.onPressed, isNull);
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+        ctrl.release();
+        await tester.pumpAndSettle();
+      },
+    );
   });
 }

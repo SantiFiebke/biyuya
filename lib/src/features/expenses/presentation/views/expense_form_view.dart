@@ -39,7 +39,9 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
     final expense = widget.expense;
 
     _amountController = TextEditingController(
-      text: expense?.amount.toStringAsFixed(2) ?? '',
+      text: expense == null
+          ? ''
+          : FormValidators.formatAmountInput(expense.amount),
     );
     _descriptionController = TextEditingController(
       text: expense?.description ?? '',

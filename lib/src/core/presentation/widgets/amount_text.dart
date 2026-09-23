@@ -36,6 +36,8 @@ class AmountText extends StatelessWidget {
     final sign = showSign ? (amount < 0 ? '-' : '+') : '';
     final value = _format.format(amount.abs()).trim();
     return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       text: TextSpan(
         style: base,
         children: [

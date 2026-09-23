@@ -5,12 +5,15 @@ import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/core/presentation/widgets/category_avatar.dart';
+import 'package:biyuya/src/core/presentation/widgets/duplicate_warning_badge.dart';
 import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
 import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
+import 'package:biyuya/src/core/presentation/widgets/pending_badge.dart';
 import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/domain/utils/duplicate_detection.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/category_filter_sheet.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/member_filter_sheet.dart';
@@ -161,7 +164,25 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
             onClear: _clearFilters,
           ),
 
-          // 2. List or skeleton / empty
+          // 2. Retry sync (only when there is something pending)
+          if (asyncExpenses.value?.any(
+                (e) => e.syncStatus != ExpenseSyncStatus.synced,
+              ) ??
+              false)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: TextButton.icon(
+                  onPressed: () =>
+                      ref.read(expenseControllerProvider.notifier).retrySync(),
+                  icon: const Icon(Icons.sync, size: 16),
+                  label: const Text('Reintentar sync'),
+                ),
+              ),
+            ),
+
+          // 3. List or skeleton / empty
           Expanded(
             child: asyncExpenses.when(
               loading: () => const _ExpenseSkeleton(),
@@ -182,7 +203,10 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
                   );
                 }
 
-                // 2a. Summary
+                // 2a. Duplicates (computed once per list, not per tile)
+                final duplicateIds = findDuplicateExpenseIds(filtered);
+
+                // 2b. Summary
                 final total = filtered.fold<double>(
                   0,
                   (sum, e) => sum + e.amount,
@@ -191,7 +215,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
                   context,
                 ).extension<AppColors>()?.expense;
 
-                // 2b. List
+                // 2c. List
                 return Column(
                   children: [
                     SummaryCard(
@@ -218,6 +242,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
                           return ExpenseListTile(
                             expense: expense,
                             category: category,
+                            isDuplicate: duplicateIds.contains(expense.id),
                             onTap: () => context.push(
                               AppRoute.expenseEdit(expense.id.toString()),
                               extra: expense,
@@ -463,6 +488,7 @@ class ExpenseListTile extends StatelessWidget {
   const ExpenseListTile({
     required this.expense,
     required this.category,
+    required this.isDuplicate,
     required this.onTap,
     required this.onDelete,
     super.key,
@@ -470,6 +496,7 @@ class ExpenseListTile extends StatelessWidget {
 
   final Expense expense;
   final Category? category;
+  final bool isDuplicate;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -478,6 +505,8 @@ class ExpenseListTile extends StatelessWidget {
     final expenseColor = Theme.of(context).extension<AppColors>()?.expense;
     final icon = iconFromCodePoint(category?.icon);
     final color = parseCategoryColor(category?.color);
+    final hasBadges =
+        isDuplicate || expense.syncStatus != ExpenseSyncStatus.synced;
 
     return Dismissible(
       key: ValueKey(expense.id),
@@ -493,50 +522,79 @@ class ExpenseListTile extends StatelessWidget {
         return false;
       },
       child: ListTile(
+        isThreeLine: hasBadges,
         leading: CategoryAvatar(icon: icon, color: color),
         title: Text(
           expense.description ?? category?.name ?? 'Sin descripción',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        subtitle: Text(
-          '${category?.name ?? ''} · ${formatHumanDate(expense.date)}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        trailing: Row(
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            AmountText(amount: expense.amount, color: expenseColor),
-            const SizedBox(width: 4),
-            PopupMenuButton<_ExpenseTileAction>(
-              tooltip: 'Más opciones',
-              onSelected: (action) {
-                switch (action) {
-                  case _ExpenseTileAction.edit:
-                    onTap();
-                  case _ExpenseTileAction.delete:
-                    onDelete();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: _ExpenseTileAction.edit,
-                  child: Text('Editar'),
+            // ponytail: single ellipsized line; long category may ellipsize the
+            // date too, acceptable — full data lives in the detail view.
+            Text(
+              '${category?.name ?? ''} · ${formatHumanDate(expense.date)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (hasBadges)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    if (isDuplicate) const DuplicateWarningBadge(),
+                    if (expense.syncStatus != ExpenseSyncStatus.synced)
+                      const PendingBadge(),
+                  ],
                 ),
-                PopupMenuItem(
-                  value: _ExpenseTileAction.delete,
-                  child: Text(
-                    'Eliminar',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+              ),
+          ],
+        ),
+        trailing: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 160),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: AmountText(amount: expense.amount, color: expenseColor),
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<_ExpenseTileAction>(
+                tooltip: 'Más opciones',
+                onSelected: (action) {
+                  switch (action) {
+                    case _ExpenseTileAction.edit:
+                      onTap();
+                    case _ExpenseTileAction.delete:
+                      onDelete();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: _ExpenseTileAction.edit,
+                    child: Text('Editar'),
+                  ),
+                  PopupMenuItem(
+                    value: _ExpenseTileAction.delete,
+                    child: Text(
+                      'Eliminar',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
         onTap: onTap,
       ),

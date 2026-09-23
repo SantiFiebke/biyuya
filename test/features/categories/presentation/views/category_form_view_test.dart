@@ -143,6 +143,46 @@ void main() {
       expect(find.byType(TextFormField), findsNWidgets(2));
     });
 
+    testWidgets('budget field formats thousands live', (tester) async {
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
+      await tester.pumpAndSettle();
+
+      final budgetField = find.byType(TextFormField).at(1);
+
+      await tester.enterText(budgetField, '1500');
+      await tester.pump();
+      expect(tester.widget<TextFormField>(budgetField).controller?.text, '1.500');
+
+      await tester.enterText(budgetField, '1234,56');
+      await tester.pump();
+      expect(
+        tester.widget<TextFormField>(budgetField).controller?.text,
+        '1.234,56',
+      );
+    });
+
+    testWidgets('pre-fills formatted budget in edit mode', (tester) async {
+      final category = Category(
+        id: 42,
+        name: 'Food',
+        householdId: 1,
+        createdAt: DateTime(2025),
+        color: '#4CAF50',
+        icon: '63046',
+        budgetAmount: 1500.5,
+      );
+
+      await tester.pumpWidget(
+        wrapTest(child: CategoryFormView(category: category)),
+      );
+      await tester.pumpAndSettle();
+
+      final budgetField = tester.widget<TextFormField>(
+        find.byType(TextFormField).at(1),
+      );
+      expect(budgetField.controller?.text, '1.500,50');
+    });
+
     testWidgets('submits parsed budgetAmount from valid value', (tester) async {
       final fake = FakeCategoryController();
       await tester.pumpWidget(
@@ -151,7 +191,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextFormField).at(0), 'Food');
-      await tester.enterText(find.byType(TextFormField).at(1), '1500.50');
+      await tester.enterText(find.byType(TextFormField).at(1), '1500,50');
       await tester.ensureVisible(find.text('Crear'));
       await tester.tap(find.text('Crear'));
       await tester.pumpAndSettle();

@@ -62,6 +62,15 @@ class FormValidators {
     return trimmed.replaceAll('.', '');
   }
 
+  /// Formatea un monto para prellenar inputs (locale es_AR, coma decimal).
+  static String formatAmountInput(double amount) {
+    return NumberFormat.currency(
+      locale: 'es_AR',
+      symbol: '',
+      decimalDigits: 2,
+    ).format(amount).trim();
+  }
+
   /// Normaliza el separador decimal (coma -> punto) y parsea.
   static double? parseAmount(String? value) {
     if (value == null) {
@@ -218,14 +227,19 @@ class DecimalTextInputFormatter extends TextInputFormatter {
 }
 
 /// Formatea el input con separadores de miles según locale.
-/// Permite dígitos y un separador decimal (coma o punto).
-/// Cursor se reposiciona al final tras formatear.
+/// Idempotente: re-formatea el texto ya formateado sin colapsar el valor.
+/// En es_AR el punto es separador de miles y la coma es decimal.
 class CurrencyTextInputFormatter extends TextInputFormatter {
-  CurrencyTextInputFormatter({this.locale = 'es_AR', this.decimalDigits = 2})
-    : _formatter = NumberFormat.decimalPattern(locale);
+  CurrencyTextInputFormatter({
+    this.locale = 'es_AR',
+    this.decimalDigits = 2,
+    this.maxIntegerDigits = FormValidators.amountMaxIntegerDigits,
+  }) : _formatter = NumberFormat.decimalPattern(locale)
+         ..maximumFractionDigits = 0;
 
   final String locale;
   final int decimalDigits;
+  final int maxIntegerDigits;
   final NumberFormat _formatter;
 
   @override
@@ -233,47 +247,34 @@ class CurrencyTextInputFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final text = newValue.text;
-    if (text.isEmpty) {
+    if (newValue.text.isEmpty) {
       return newValue;
     }
 
-    // Strip non-numeric chars except comma/period
-    final stripped = text.replaceAll(RegExp(r'[^\d,.]'), '');
-    if (stripped.isEmpty) {
-      return TextEditingValue.empty;
-    }
+    // Solo dígitos y comas; el punto es agrupación y siempre se descarta.
+    final cleaned = newValue.text.replaceAll(RegExp(r'[^\d,]'), '');
 
-    // Check if user is actively typing a decimal separator
-    final endsWithSep = stripped.endsWith('.') || stripped.endsWith(',');
+    final commaIndex = cleaned.indexOf(',');
+    final intPart = commaIndex == -1
+        ? cleaned
+        : cleaned.substring(0, commaIndex);
+    final decPart = commaIndex == -1
+        ? ''
+        : cleaned.substring(commaIndex + 1).replaceAll(',', '');
 
-    // Normalize comma → period for parsing
-    final normalized = stripped.replaceAll(',', '.');
-    final value = double.tryParse(normalized);
-
-    // User just typed separator — show integer part + comma
-    if (endsWithSep && value == null) {
-      final intPart = normalized.split('.').first;
-      final parsed = int.tryParse(intPart);
-      if (parsed == null) {
-        return oldValue;
-      }
-      final formatted = _formatter.format(parsed);
-      final newText = '$formatted,';
-      return TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: newText.length),
-      );
-    }
-
-    if (value == null) {
+    if (intPart.length > maxIntegerDigits || decPart.length > decimalDigits) {
       return oldValue;
     }
 
-    final formatted = _formatter.format(value);
+    final intValue = int.tryParse(intPart.isEmpty ? '0' : intPart) ?? 0;
+    final grouped = _formatter.format(intValue);
+
+    final hasComma = newValue.text.contains(',');
+    final text = hasComma ? '$grouped,$decPart' : grouped;
+
     return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

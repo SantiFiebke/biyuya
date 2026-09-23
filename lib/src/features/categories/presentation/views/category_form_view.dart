@@ -56,7 +56,9 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
     final cat = widget.category;
     _nameController = TextEditingController(text: cat?.name ?? '');
     _budgetController = TextEditingController(
-      text: cat?.budgetAmount?.toString() ?? '',
+      text: cat?.budgetAmount == null
+          ? ''
+          : FormValidators.formatAmountInput(cat!.budgetAmount!),
     );
     _selectedColor = cat?.color;
     _selectedIcon = cat?.icon != null
@@ -143,7 +145,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                inputFormatters: const [DecimalTextInputFormatter()],
+                inputFormatters: [CurrencyTextInputFormatter()],
                 enabled: !_saving,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {

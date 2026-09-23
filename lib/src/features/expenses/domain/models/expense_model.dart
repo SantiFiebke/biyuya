@@ -11,6 +11,8 @@ class ExpenseModel extends Expense {
     super.description,
     super.userUuid,
     super.userName,
+    super.clientId,
+    super.syncStatus,
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class ExpenseModel extends Expense {
       userUuid: json['user_uuid'] as String?,
       userName: profiles?['name'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
+      clientId: json['client_id'] as String?,
     );
   }
 
@@ -37,6 +40,7 @@ class ExpenseModel extends Expense {
       'household_id': householdId,
       'category_id': categoryId,
       'user_uuid': userUuid,
+      'client_id': clientId,
     };
   }
 }

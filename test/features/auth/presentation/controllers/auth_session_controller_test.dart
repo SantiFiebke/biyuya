@@ -121,5 +121,64 @@ void main() {
 
       verify(() => mockRepo.onProfileChanged(userId: 'user-1')).called(1);
     });
+
+    test('keeps last AsyncData when profile stream emits an error', () async {
+      final container = createContainer();
+      addTearDown(container.dispose);
+
+      container.listen<AsyncValue<UserProfile?>>(
+        authSessionControllerProvider,
+        (_, _) {},
+      );
+
+      const profile = UserProfile(id: 'user-1', name: 'Test', lastName: 'User');
+      authStateController.add(profile);
+      await Future<void>.delayed(Duration.zero);
+
+      // Realtime channel drops: profile stream emits an error. Without the
+      // onError handler this would be an uncaught async error and fail the test.
+      profileController.addError(Exception('socket drop'));
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(authSessionControllerProvider);
+      expect(state, isA<AsyncData<UserProfile?>>());
+      expect(state.value, profile);
+      expect(state.hasError, isFalse);
+    });
+
+    test(
+      'profile subscription survives an error (cancelOnError: false)',
+      () async {
+        final container = createContainer();
+        addTearDown(container.dispose);
+
+        container.listen<AsyncValue<UserProfile?>>(
+          authSessionControllerProvider,
+          (_, _) {},
+        );
+
+        const profile = UserProfile(
+          id: 'user-1',
+          name: 'Test',
+          lastName: 'User',
+        );
+        authStateController.add(profile);
+        await Future<void>.delayed(Duration.zero);
+
+        profileController.addError(Exception('socket drop'));
+        await Future<void>.delayed(Duration.zero);
+
+        // Subscription must still be alive after the error.
+        const updated = UserProfile(
+          id: 'user-1',
+          name: 'Updated',
+          lastName: 'User',
+        );
+        profileController.add(updated);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(container.read(authSessionControllerProvider).value, updated);
+      },
+    );
   });
 }

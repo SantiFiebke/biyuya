@@ -132,6 +132,7 @@ class CategoryTile extends StatelessWidget {
           child: Icon(iconFromCodePoint(category.icon), color: color, size: 20),
         ),
         title: Text(category.name),
+        onTap: onEdit,
         trailing: IconButton(
           icon: const Icon(Icons.edit_outlined),
           onPressed: onEdit,

@@ -144,7 +144,7 @@ GoRouter router(Ref ref) {
           final isRegistering = loc == AppRoute.register.path;
           final isVerifyingEmail = loc == AppRoute.verifyEmail.path;
 
-          // 1. Sin sesión
+          // 1. Without session
           if (userProfile == null) {
             FlutterNativeSplash.remove();
             return (isLoggingIn || isRegistering || isVerifyingEmail)
@@ -155,14 +155,14 @@ GoRouter router(Ref ref) {
           // Auth resolved with valid user — remove native splash
           FlutterNativeSplash.remove();
 
-          // 2. Con sesión activa pero sin hogar
+          // 2. With valid session but no household
           if (!userProfile.hasHousehold) {
             return loc == AppRoute.onboarding.path
                 ? null
                 : AppRoute.onboarding.path;
           }
 
-          // 3. Con sesión y con hogar
+          // 3. With valid session and household
           if (isLoggingIn ||
               isRegistering ||
               isVerifyingEmail ||
@@ -178,7 +178,6 @@ GoRouter router(Ref ref) {
           return AppRoute.login.path;
         },
         loading: () {
-          // Mantiene /splash (mientras el Splash Nativo aún sigue visible cubriéndolo)
           return AppRoute.splash.path;
         },
       );

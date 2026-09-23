@@ -226,9 +226,7 @@ void main() {
 
     testWidgets('bar is expense color when ratio exceeds 1', (tester) async {
       stubReport(
-        makeReport(
-          categoryBreakdowns: [breakdown(budgetAmount: 500)],
-        ),
+        makeReport(categoryBreakdowns: [breakdown(budgetAmount: 500)]),
       );
 
       await pumpReport(tester);

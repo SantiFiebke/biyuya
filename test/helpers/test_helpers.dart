@@ -72,6 +72,7 @@ Expense makeExpense({
   int householdId = 1,
   int categoryId = 1,
   DateTime? date,
+  ExpenseSyncStatus syncStatus = ExpenseSyncStatus.synced,
 }) {
   return Expense(
     id: id,
@@ -81,6 +82,7 @@ Expense makeExpense({
     householdId: householdId,
     categoryId: categoryId,
     createdAt: DateTime(2025, 7),
+    syncStatus: syncStatus,
   );
 }
 

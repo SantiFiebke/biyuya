@@ -1,19 +1,29 @@
 import 'dart:async';
 
 import 'package:biyuya/src/core/data/widget_daily_total_sync.dart';
+import 'package:biyuya/src/core/network/connectivity_provider.dart';
 import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
+import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:uuid/uuid.dart';
 
 part 'expense_controller.g.dart';
 
 @Riverpod(keepAlive: true)
 class ExpenseController extends _$ExpenseController {
+  bool _isSubmitting = false;
+
   @override
   AsyncValue<List<Expense>> build() {
+    ref.listen(isOnlineProvider, (previous, next) {
+      if (next.value == true) {
+        unawaited(retrySync());
+      }
+    });
     unawaited(Future.microtask(_loadExpenses));
     return const AsyncData([]);
   }
@@ -27,14 +37,16 @@ class ExpenseController extends _$ExpenseController {
       return;
     }
 
+    final pending = await ref.read(pendingExpenseStoreProvider).load();
+
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.getExpenses(
       householdId: int.parse(householdId),
     );
     result.when(
-      _emitExpenses,
-      (failure) => state = AsyncError(failure, StackTrace.current),
+      (synced) => _merge(synced, pending),
+      (failure) => _emitLoadFailure(failure, pending),
     );
   }
 
@@ -50,6 +62,8 @@ class ExpenseController extends _$ExpenseController {
       return;
     }
 
+    final pending = await ref.read(pendingExpenseStoreProvider).load();
+
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.getExpensesByMonth(
@@ -58,8 +72,8 @@ class ExpenseController extends _$ExpenseController {
       month: month,
     );
     result.when(
-      _emitExpenses,
-      (failure) => state = AsyncError(failure, StackTrace.current),
+      (synced) => _merge(synced, pending),
+      (failure) => _emitLoadFailure(failure, pending),
     );
   }
 
@@ -82,6 +96,56 @@ class ExpenseController extends _$ExpenseController {
     unawaited(WidgetDailyTotalSync.syncTotal(todayTotal));
   }
 
+  /// Single failure exit point for load/reload paths: keep pending expenses
+  /// visible when present, otherwise surface the error.
+  void _emitLoadFailure(Object failure, List<Expense> pending) {
+    if (pending.isNotEmpty) {
+      _emitExpenses(pending);
+    } else {
+      state = AsyncError(failure, StackTrace.current);
+    }
+  }
+
+  /// Concatenates synced + pending and emits them by date descending.
+  /// Copies first so the inputs are never mutated.
+  void _merge(List<Expense> synced, List<Expense> pending) {
+    final merged = [...synced, ...pending]
+      ..sort((a, b) => b.date.compareTo(a.date));
+    _emitExpenses(merged);
+  }
+
+  /// Reloads the outbox, refreshes the network list and re-merges.
+  Future<void> _reloadMerge() async {
+    final pending = await ref.read(pendingExpenseStoreProvider).load();
+    final session = ref.read(authSessionControllerProvider);
+    final householdId = session.value?.householdId;
+
+    if (householdId == null || householdId.isEmpty) {
+      _emitExpenses(pending);
+      return;
+    }
+
+    final result = await ref
+        .read(expenseRepositoryProvider)
+        .getExpenses(householdId: int.parse(householdId));
+    result.when(
+      (synced) => _merge(synced, pending),
+      (failure) => _emitLoadFailure(failure, pending),
+    );
+  }
+
+  Future<void> _flushAndRemerge() async {
+    await ref.read(expenseSyncServiceProvider).flush();
+    await _reloadMerge();
+  }
+
+  /// Flushes the outbox, refreshes state and reports.
+  Future<void> retrySync() async {
+    await ref.read(expenseSyncServiceProvider).flush();
+    await _reloadMerge();
+    ref.invalidate(reportControllerProvider);
+  }
+
   Future<bool> createExpense({
     required double amount,
     required DateTime date,
@@ -98,28 +162,30 @@ class ExpenseController extends _$ExpenseController {
 
     final previous = state.value ?? [];
     state = const AsyncLoading();
-    final repository = ref.read(expenseRepositoryProvider);
-    final result = await repository.createExpense(
+
+    final clientId = const Uuid().v4();
+    final pendingExpense = Expense.pending(
       amount: amount,
       date: date,
-      description: description,
       householdId: int.parse(householdId),
       categoryId: categoryId,
+      clientId: clientId,
+      description: description,
       userUuid: userUuid,
+      userName: session.value?.name,
     );
 
-    return await result.when(
-      (expense) {
-        final updated = [expense, ...previous];
-        _emitExpenses(updated);
-        ref.invalidate(reportControllerProvider);
-        return true;
-      },
-      (failure) {
-        state = AsyncError(failure, StackTrace.current);
-        return false;
-      },
-    );
+    await ref.read(pendingExpenseStoreProvider).add(pendingExpense);
+    _emitExpenses([pendingExpense, ...previous]);
+
+    unawaited(_flushAndRemerge());
+    return true;
+  }
+
+  Future<bool> discardPending(String clientId) async {
+    await ref.read(pendingExpenseStoreProvider).remove(clientId);
+    await _reloadMerge();
+    return true;
   }
 
   Future<bool> updateExpense({
@@ -130,6 +196,13 @@ class ExpenseController extends _$ExpenseController {
     String? description,
   }) async {
     final previous = state.value ?? [];
+    final existingIndex = previous.indexWhere((e) => e.id == id);
+    if (existingIndex != -1 &&
+        previous[existingIndex].syncStatus == ExpenseSyncStatus.pending) {
+      // ponytail: update offline no requerido
+      return false;
+    }
+
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.updateExpense(
@@ -167,30 +240,49 @@ class ExpenseController extends _$ExpenseController {
     String? description,
     int? expenseId,
   }) async {
-    if (expenseId != null) {
-      return await updateExpense(
-        id: expenseId,
+    // ponytail: guard controller-level + AsyncLoading habilita el disable existente del form
+    if (_isSubmitting) {
+      return false;
+    }
+    _isSubmitting = true;
+    try {
+      if (expenseId != null) {
+        return await updateExpense(
+          id: expenseId,
+          amount: amount,
+          date: date,
+          description: description,
+          categoryId: categoryId,
+        );
+      }
+      return await createExpense(
         amount: amount,
         date: date,
         description: description,
         categoryId: categoryId,
       );
+    } finally {
+      _isSubmitting = false;
     }
-    return await createExpense(
-      amount: amount,
-      date: date,
-      description: description,
-      categoryId: categoryId,
-    );
   }
 
   Future<bool> deleteExpense({required int id}) async {
     final previous = state.value ?? [];
+    final index = previous.indexWhere((e) => e.id == id);
+
+    // Pending expense never hit the server: just drop it from the outbox.
+    if (index != -1 &&
+        previous[index].syncStatus == ExpenseSyncStatus.pending) {
+      final clientId = previous[index].clientId;
+      if (clientId != null) {
+        return await discardPending(clientId);
+      }
+      _emitExpenses(previous.where((e) => e.id != id).toList());
+      return true;
+    }
 
     state = const AsyncLoading();
-
     final repository = ref.read(expenseRepositoryProvider);
-
     final result = await repository.deleteExpense(id: id);
 
     return await result.when(

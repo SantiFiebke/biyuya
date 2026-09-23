@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/presentation/widgets/offline_banner.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -13,7 +14,12 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        body: navigationShell,
+        body: Column(
+          children: [
+            const OfflineBanner(),
+            Expanded(child: navigationShell),
+          ],
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: navigationShell.currentIndex,
           onDestinationSelected: (index) {

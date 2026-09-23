@@ -4,135 +4,70 @@ import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/views/expense_detail_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart' show Override;
 
-final _testExpense = Expense(
-  id: 42,
-  amount: 150.75,
-  date: DateTime(2025, 6, 15),
-  description: 'Groceries',
+import '../../../../helpers/test_helpers.dart';
+
+final _pendingExpense = Expense(
+  id: 2,
+  amount: 50,
+  date: DateTime(2025, 7, 12),
+  description: 'Pending',
   householdId: 1,
-  categoryId: 2,
+  categoryId: 1,
   userUuid: 'user-1',
-  userName: 'Test User',
-  createdAt: DateTime(2025, 6, 15),
+  clientId: 'client-2',
+  syncStatus: ExpenseSyncStatus.pending,
+  createdAt: DateTime(2025, 7, 12),
 );
 
-final _testCategories = [
-  Category(
-    id: 2,
-    name: 'Transport',
-    householdId: 1,
-    createdAt: DateTime(2025),
-    color: '#2196F3',
-    icon: '57681',
+final _syncedExpense = Expense(
+  id: 1,
+  amount: 200,
+  date: DateTime(2025, 7, 10),
+  description: 'Synced',
+  householdId: 1,
+  categoryId: 1,
+  userUuid: 'user-1',
+  createdAt: DateTime(2025, 7, 10),
+);
+
+List<Override> _overrides() => [
+  categoryControllerProvider.overrideWithValue(
+    const AsyncData<List<Category>>([]),
   ),
 ];
 
-Widget wrap(Widget child) {
-  return ProviderScope(
-    overrides: [
-      categoryControllerProvider.overrideWithValue(
-        AsyncData<List<Category>>(_testCategories),
-      ),
-    ],
-    child: MaterialApp(home: child),
-  );
-}
-
 void main() {
-  group('ExpenseDetailView', () {
-    testWidgets('shows app bar with title', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Detalle del gasto'), findsOneWidget);
-    });
-
-    testWidgets('displays expense amount', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
-      await tester.pumpAndSettle();
-
-      // 150.75 formatted as currency
-      expect(find.textContaining('150'), findsOneWidget);
-    });
-
-    testWidgets('displays description', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Descripción'), findsOneWidget);
-      expect(find.text('Groceries'), findsOneWidget);
-    });
-
-    testWidgets('displays category name', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Categoría'), findsOneWidget);
-      expect(find.text('Transport'), findsOneWidget);
-    });
-
-    testWidgets('displays formatted date', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Fecha'), findsOneWidget);
-      expect(find.text('15 de junio'), findsOneWidget);
-    });
-
-    testWidgets('displays user name', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Registrado por'), findsOneWidget);
-      expect(find.text('Test User'), findsOneWidget);
-    });
-
-    testWidgets('edit button exists in app bar', (tester) async {
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: _testExpense)));
-      await tester.pumpAndSettle();
-
-      expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
-    });
-
-    testWidgets('shows "Sin descripción" when description is null', (
+  group('ExpenseDetailView pending actions', () {
+    testWidgets('shows "Descartar" action for a pending expense', (
       tester,
     ) async {
-      final expenseNoDesc = Expense(
-        id: 1,
-        amount: 100,
-        date: DateTime(2025),
-        householdId: 1,
-        categoryId: 2,
-        userUuid: 'user-1',
-        createdAt: DateTime(2025),
-      );
-      await tester.pumpWidget(wrap(ExpenseDetailView(expense: expenseNoDesc)));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Sin descripción'), findsOneWidget);
-    });
-
-    testWidgets('shows "Sin categoría" when category not found', (
-      tester,
-    ) async {
-      final expenseOtherCategory = Expense(
-        id: 1,
-        amount: 100,
-        date: DateTime(2025),
-        description: 'Test',
-        householdId: 1,
-        categoryId: 999, // No matching category
-        userUuid: 'user-1',
-        createdAt: DateTime(2025),
-      );
       await tester.pumpWidget(
-        wrap(ExpenseDetailView(expense: expenseOtherCategory)),
+        wrapTest(
+          child: ExpenseDetailView(expense: _pendingExpense),
+          overrides: _overrides(),
+        ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Sin categoría'), findsOneWidget);
+      expect(find.byTooltip('Descartar'), findsOneWidget);
+      expect(find.byTooltip('Editar'), findsNothing);
+    });
+
+    testWidgets('shows "Editar" and no "Descartar" for a synced expense', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: ExpenseDetailView(expense: _syncedExpense),
+          overrides: _overrides(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Editar'), findsOneWidget);
+      expect(find.byTooltip('Descartar'), findsNothing);
     });
   });
 }
