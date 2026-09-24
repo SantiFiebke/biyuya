@@ -1,3 +1,5 @@
+// ignore_for_file: async_return_with_no_await — result.when returns directly; async needed for repository await above
+
 import 'dart:async';
 
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
@@ -59,7 +61,6 @@ class CategoryController extends _$CategoryController {
       householdId: int.parse(householdId),
     );
 
-    // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
     return result.when(
       (category) {
         state = AsyncData([...previous, category]);
@@ -91,7 +92,6 @@ class CategoryController extends _$CategoryController {
       budgetAmount: budgetAmount,
     );
 
-    // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
     return result.when(
       (updated) {
         final index = previous.indexWhere((c) => c.id == id);
@@ -140,7 +140,7 @@ class CategoryController extends _$CategoryController {
     final repository = ref.read(categoryRepositoryProvider);
 
     final result = await repository.deleteCategory(id: id);
-    // ignore: async_return_with_no_await — result.when returns directly; async needed for repository await above
+    
     return result.when(
       (_) {
         state = AsyncData(previous.where((c) => c.id != id).toList());
