@@ -38,6 +38,8 @@ class MyApp extends ConsumerStatefulWidget {
 class _MyAppState extends ConsumerState<MyApp> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
+  Uri? _lastUri;
+  DateTime? _lastUriAt;
 
   @override
   void initState() {
@@ -79,13 +81,33 @@ class _MyAppState extends ConsumerState<MyApp> {
     if (uri.scheme != 'biyuya') {
       return;
     }
-    if (uri.host != 'expense' || uri.path != '/new') {
+    if (uri.host != 'expense' || (uri.path != '/new' && uri.path != '/new/')) {
       return;
     }
 
+    // Cold start can dispatch the same URI twice (getInitialLink + uriLinkStream).
+    final now = DateTime.now();
+    if (uri == _lastUri &&
+        _lastUriAt != null &&
+        now.difference(_lastUriAt!) < const Duration(milliseconds: 800)) {
+      return;
+    }
+    _lastUri = uri;
+    _lastUriAt = now;
+
+    final categoryId = int.tryParse(uri.queryParameters['categoryId'] ?? '');
+    final target = categoryId == null
+        ? AppRoute.expenseNew.path
+        : '${AppRoute.expenseNew.path}?categoryId=$categoryId';
+
+    debugPrint('[DeepLink] handling $uri -> $target');
+
     // Delay navigation slightly to let auth redirect resolve first
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(routerProvider).go(AppRoute.expenseNew.path);
+      // Persist target so the redirect can re-issue it once auth resolves
+      // (cold start: authSessionControllerProvider is still `loading`).
+      ref.read(pendingDeepLinkProvider.notifier).target = target;
+      ref.read(routerProvider).go(target);
     });
   }
 

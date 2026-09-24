@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:biyuya/src/core/network/connectivity_provider.dart';
 import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/data/local/pending_expense_store.dart';
 import 'package:biyuya/src/features/expenses/data/repositories/expense_repository_impl.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
@@ -58,6 +60,15 @@ class FakePendingExpenseStore extends PendingExpenseStore {
   Future<void> clear() async => _items.clear();
 }
 
+/// Controllable [CategoryController] for cold-start tests: starts empty and
+/// lets the test push categories in later, mimicking the async load.
+class FakeCategoryController extends CategoryController {
+  @override
+  AsyncValue<List<Category>> build() => const AsyncData([]);
+
+  void emit(List<Category> categories) => state = AsyncData(categories);
+}
+
 Expense pendingExpense({
   int id = -1,
   String clientId = 'client-1',
@@ -105,13 +116,28 @@ void main() {
     ).thenAnswer((_) => answer());
   }
 
-  ProviderContainer createContainer({Stream<bool>? online}) {
+  ProviderContainer createContainer({
+    Stream<bool>? online,
+    CategoryController? categoryController,
+  }) {
     return ProviderContainer(
       overrides: [
         expenseRepositoryProvider.overrideWithValue(mockRepo),
         authSessionControllerProvider.overrideWith(
           FakeAuthSessionController.new,
         ),
+        // _emitExpenses reads the category controller to resolve featured
+        // categories for the widget. Override it so the real Supabase-backed
+        // repository is never touched.
+        if (categoryController != null)
+          categoryControllerProvider.overrideWith(() => categoryController)
+        else
+          categoryControllerProvider.overrideWithValue(
+            AsyncData<List<Category>>([
+              makeCategory(name: 'Food'),
+              makeCategory(id: 2, name: 'Transport'),
+            ]),
+          ),
         supabaseClientProvider.overrideWithValue(mockSupabaseClient),
         pendingExpenseStoreProvider.overrideWithValue(store),
         isOnlineProvider.overrideWith(
@@ -122,9 +148,15 @@ void main() {
   }
 
   /// Rebuild the container with a custom connectivity stream.
-  void recreateContainer({Stream<bool>? online}) {
+  void recreateContainer({
+    Stream<bool>? online,
+    CategoryController? categoryController,
+  }) {
     container.dispose();
-    container = createContainer(online: online);
+    container = createContainer(
+      online: online,
+      categoryController: categoryController,
+    );
   }
 
   /// Drain the event loop so unawaited flush/reload work completes.
@@ -773,5 +805,49 @@ void main() {
       expect(refreshCalls, isNotEmpty);
       expect(refreshCalls.last.method, 'refresh');
     });
+
+    test(
+      'cold start: featured categories re-sync when categories load after '
+      'expenses (widget_featured_categories goes from [] to populated)',
+      () async {
+        // Categories start empty (still loading) while an expense is already
+        // present — the cold-start race the fix targets.
+        final fakeCategories = FakeCategoryController();
+        recreateContainer(categoryController: fakeCategories);
+
+        final now = DateTime.now();
+        when(() => mockRepo.getExpenses(householdId: 1)).thenAnswer(
+          (_) async => Success([
+            Expense(
+              id: 1,
+              amount: 100,
+              date: DateTime(now.year, now.month, now.day),
+              householdId: 1,
+              categoryId: 1,
+              createdAt: now,
+            ),
+          ]),
+        );
+
+        container.read(expenseControllerProvider);
+        await waitForLoad();
+        await pumpForSync();
+
+        final prefs = await SharedPreferences.getInstance();
+        // No categories yet: widget got the empty fallback.
+        expect(prefs.getString('widget_featured_categories'), '[]');
+
+        // Categories finish loading → ref.listen re-syncs featured chips.
+        fakeCategories.emit([
+          makeCategory(name: 'Food'),
+          makeCategory(id: 2, name: 'Transport'),
+        ]);
+        await pumpForSync();
+
+        final json = prefs.getString('widget_featured_categories')!;
+        expect(json, contains('Food'));
+        expect(json, contains('Transport'));
+      },
+    );
   });
 }

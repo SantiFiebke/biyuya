@@ -47,7 +47,7 @@ final List<DefaultCategory> defaultCategories = <DefaultCategory>[
   DefaultCategory(
     name: 'Salud',
     color: '#4CAF50',
-    icon: Icons.local_hospital.codePoint,
+    icon: Icons.medical_services.codePoint,
   ),
   DefaultCategory(
     name: 'Ocio',

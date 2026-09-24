@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/constants/app_constants.dart';
 import 'package:biyuya/src/core/data/widget_daily_total_sync.dart';
 import 'package:biyuya/src/core/network/connectivity_provider.dart';
 import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/domain/services/featured_categories_calculator.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
@@ -24,6 +28,17 @@ class ExpenseController extends _$ExpenseController {
         unawaited(retrySync());
       }
     });
+    // Cold start: categories may still be loading when expenses are emitted,
+    // so re-sync featured chips once they arrive.
+    ref.listen<AsyncValue<List<Category>>>(categoryControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (next.value == null) {
+        return;
+      }
+      _syncFeaturedCategories(state.value ?? const <Expense>[]);
+    });
     unawaited(Future.microtask(_loadExpenses));
     return const AsyncData([]);
   }
@@ -33,7 +48,7 @@ class ExpenseController extends _$ExpenseController {
     final householdId = session.value?.householdId;
 
     if (householdId == null || householdId.isEmpty) {
-      state = const AsyncData([]);
+      _emitExpenses(const []);
       return;
     }
 
@@ -58,7 +73,7 @@ class ExpenseController extends _$ExpenseController {
     final householdId = session.value?.householdId;
 
     if (householdId == null || householdId.isEmpty) {
-      state = const AsyncData([]);
+      _emitExpenses(const []);
       return;
     }
 
@@ -94,6 +109,31 @@ class ExpenseController extends _$ExpenseController {
         )
         .fold<double>(0, (sum, e) => sum + e.amount);
     unawaited(WidgetDailyTotalSync.syncTotal(todayTotal));
+
+    _syncFeaturedCategories(expenses);
+  }
+
+  /// Resolves the featured category chips from [expenses] and the currently
+  /// loaded categories, then pushes them to the widget. Safe to call when
+  /// categories are still loading (falls back to an empty list).
+  void _syncFeaturedCategories(List<Expense> expenses) {
+    final ids = topCategoryIdsLastWeek(
+      expenses,
+      DateTime.now(),
+      // Explicit limit keeps the featured count visible at the call site.
+      // ignore: avoid_redundant_argument_values
+      limit: kFeaturedCategoryCount,
+    );
+    final categories =
+        ref.read(categoryControllerProvider).value ?? const <Category>[];
+    final byId = {for (final category in categories) category.id: category};
+    final resolved = ids.map((id) => byId[id]).whereType<Category>().toList();
+    // Fewer than 2 categories with recent activity: fall back to the first
+    // loaded categories so the widget always has something to show.
+    final featured = resolved.length < 2
+        ? categories.take(kFeaturedCategoryCount).toList()
+        : resolved;
+    unawaited(WidgetDailyTotalSync.syncFeaturedCategories(featured));
   }
 
   /// Single failure exit point for load/reload paths: keep pending expenses

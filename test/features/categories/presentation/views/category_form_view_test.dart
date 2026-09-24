@@ -124,6 +124,51 @@ void main() {
       expect(find.byType(IconPickerGrid), findsOneWidget);
     });
 
+    testWidgets('shows saved icon outside preset set as selected in grid', (
+      tester,
+    ) async {
+      final category = Category(
+        id: 42,
+        name: 'Salud',
+        householdId: 1,
+        createdAt: DateTime(2025),
+        color: '#4CAF50',
+        icon: Icons.local_hospital.codePoint.toString(),
+      );
+
+      await tester.pumpWidget(
+        wrapTest(child: CategoryFormView(category: category)),
+      );
+      await tester.pumpAndSettle();
+
+      // Icon fuera del set curado se agrega al final: scrollear hasta él.
+      await tester.scrollUntilVisible(
+        find.byIcon(Icons.local_hospital),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      final theme = Theme.of(tester.element(find.byType(IconPickerGrid)));
+
+      final outsideIcon = tester.widget<Icon>(
+        find.descendant(
+          of: find.byType(IconPickerGrid),
+          matching: find.byIcon(Icons.local_hospital),
+        ),
+      );
+      expect(outsideIcon.color, theme.colorScheme.primary);
+
+      // Fallback Icons.category NO queda seleccionado.
+      final fallbackIcon = tester.widget<Icon>(
+        find.descendant(
+          of: find.byType(IconPickerGrid),
+          matching: find.byIcon(Icons.category),
+        ),
+      );
+      expect(fallbackIcon.color, isNot(theme.colorScheme.primary));
+    });
+
     testWidgets('no validation error with valid name', (tester) async {
       await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
       await tester.pumpAndSettle();
@@ -151,7 +196,10 @@ void main() {
 
       await tester.enterText(budgetField, '1500');
       await tester.pump();
-      expect(tester.widget<TextFormField>(budgetField).controller?.text, '1.500');
+      expect(
+        tester.widget<TextFormField>(budgetField).controller?.text,
+        '1.500',
+      );
 
       await tester.enterText(budgetField, '1234,56');
       await tester.pump();

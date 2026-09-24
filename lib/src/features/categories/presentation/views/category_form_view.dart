@@ -12,22 +12,35 @@ export 'package:biyuya/src/core/presentation/widgets/color_picker_row.dart'
     show ColorPickerRow;
 
 const _presetIcons = <IconData>[
-  Icons.shopping_cart,
-  Icons.restaurant,
-  Icons.directions_bus,
-  Icons.home,
-  Icons.local_hospital,
-  Icons.school,
-  Icons.fitness_center,
-  Icons.pets,
-  Icons.child_care,
-  Icons.drive_eta,
-  Icons.music_note,
-  Icons.sports_esports,
-  Icons.checkroom,
-  Icons.local_grocery_store,
-  Icons.local_cafe,
-  Icons.payments,
+  Icons.shopping_cart, // supermercado
+  Icons.shopping_bag, // compras
+  Icons.restaurant, // salidas / delivery
+  Icons.directions_bus, // transporte
+  Icons.directions_car, // auto
+  Icons.local_gas_station, // combustible
+  Icons.home, // casa
+  Icons.build, // arreglos / reparaciones
+  Icons.medical_services, // salud
+  Icons.school, // educación
+  Icons.fitness_center, // gym
+  Icons.spa, // cuidado personal
+  Icons.pets, // mascotas
+  Icons.child_friendly, // bebé
+  Icons.volunteer_activism, // ayudas
+  Icons.card_giftcard, // regalos
+  Icons.checkroom, // ropa / calzado
+  Icons.credit_card, // tarjetas / préstamos
+  Icons.receipt_long, // servicios
+  Icons.bolt, // servicios (utilities)
+  Icons.phone_android, // telefonía
+  Icons.wifi, // internet
+  Icons.music_note, // ocio
+  Icons.sports_esports, // juegos
+  Icons.movie, // entretenimiento
+  Icons.flight, // viajes
+  Icons.savings, // ahorro
+  Icons.work, // trabajo
+  Icons.category, // otros
 ];
 
 class CategoryFormView extends ConsumerStatefulWidget {
@@ -64,7 +77,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
     _selectedIcon = cat?.icon != null
         ? _presetIcons.firstWhere(
             (e) => e.codePoint.toString() == cat!.icon,
-            orElse: () => Icons.category,
+            orElse: () => iconFromCodePoint(cat!.icon),
           )
         : null;
   }
@@ -211,7 +224,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
   }
 }
 
-class IconPickerGrid extends StatelessWidget {
+class IconPickerGrid extends StatefulWidget {
   const IconPickerGrid({
     required this.selectedIcon,
     required this.onIconSelected,
@@ -222,31 +235,112 @@ class IconPickerGrid extends StatelessWidget {
   final ValueChanged<IconData?> onIconSelected;
 
   @override
+  State<IconPickerGrid> createState() => _IconPickerGridState();
+}
+
+class _IconPickerGridState extends State<IconPickerGrid> {
+  static const int _perPage = 8; // 2 filas × 4 columnas
+  static const double _spacing = 8;
+
+  late final PageController _pageController;
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final selected = widget.selectedIcon;
+    final index = selected == null ? -1 : _icons.indexOf(selected);
+    _page = index >= 0 ? index ~/ _perPage : 0;
+    _pageController = PageController(initialPage: _page);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // Icono guardado fuera del set curado (hogares viejos) se agrega al final
+  // para que siga viéndose seleccionado.
+  List<IconData> get _icons => <IconData>[
+    ..._presetIcons,
+    if (widget.selectedIcon != null &&
+        !_presetIcons.contains(widget.selectedIcon))
+      widget.selectedIcon!,
+  ];
+
+  @override
   Widget build(BuildContext context) {
+    final icons = _icons;
+    final pages = (icons.length / _perPage).ceil();
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Ícono', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-          ),
-          itemCount: _presetIcons.length,
-          itemBuilder: (context, index) {
-            final icon = _presetIcons[index];
-            final isSelected = selectedIcon == icon;
-            return _IconTile(
-              icon: icon,
-              isSelected: isSelected,
-              onTap: () => onIconSelected(isSelected ? null : icon),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final tile = (constraints.maxWidth - 3 * _spacing) / 4;
+            final pageHeight = tile * 2 + _spacing;
+            return SizedBox(
+              height: pageHeight,
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: pages,
+                onPageChanged: (page) => setState(() => _page = page),
+                itemBuilder: (context, page) {
+                  final start = page * _perPage;
+                  final end = (start + _perPage).clamp(0, icons.length);
+                  final pageIcons = icons.sublist(start, end);
+                  return GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 4,
+                          mainAxisSpacing: _spacing,
+                          crossAxisSpacing: _spacing,
+                        ),
+                    itemCount: pageIcons.length,
+                    itemBuilder: (context, index) {
+                      final icon = pageIcons[index];
+                      final isSelected = widget.selectedIcon == icon;
+                      return _IconTile(
+                        icon: icon,
+                        isSelected: isSelected,
+                        onTap: () =>
+                            widget.onIconSelected(isSelected ? null : icon),
+                      );
+                    },
+                  );
+                },
+              ),
             );
           },
         ),
+        if (pages > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(pages, (i) {
+                final active = i == _page;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: active ? 10 : 8,
+                  height: active ? 10 : 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: active
+                        ? colorScheme.primary
+                        : colorScheme.outlineVariant,
+                  ),
+                );
+              }),
+            ),
+          ),
       ],
     );
   }

@@ -39,34 +39,50 @@ class CategoryDropdown extends ConsumerWidget {
         disabledHint: const Text('Error al cargar categorías'),
         onChanged: null,
       ),
-      data: (categories) => DropdownButtonFormField<int>(
-        initialValue: selectedCategoryId,
-        decoration: const InputDecoration(
-          labelText: 'Categoría',
-          prefixIcon: Icon(Icons.category_outlined),
-          hintText: 'Seleccionar categoría',
-        ),
-        items: [
-          ...categories.map(_buildItem),
-          const DropdownMenuItem<int>(
-            value: -1,
-            child: Row(
-              children: [
-                Icon(Icons.add_circle_outline, size: 20),
-                SizedBox(width: 8),
-                Text('Crear nueva categoría'),
-              ],
-            ),
+      data: (categories) {
+        // Guard: un categoryId de deep link puede no existir (categoría
+        // borrada) y DropdownButtonFormField crashea si el value no está
+        // entre los items. Se resuelve acá (no en ExpenseFormView) porque el
+        // controller arranca en AsyncData([]) y el id crashearía en el primer
+        // frame, antes de que cualquier ref.listen dispare. También cubre el
+        // modo edición con categoría eliminada.
+        final ids = categories.map((c) => c.id).toSet();
+        final value = ids.contains(selectedCategoryId)
+            ? selectedCategoryId
+            : null;
+
+        return DropdownButtonFormField<int>(
+          // Key por value: fuerza re-init del FormField cuando las categorías
+          // llegan después del primer frame, para que el prefilleo se aplique.
+          key: ValueKey(value),
+          initialValue: value,
+          decoration: const InputDecoration(
+            labelText: 'Categoría',
+            prefixIcon: Icon(Icons.category_outlined),
+            hintText: 'Seleccionar categoría',
           ),
-        ],
-        onChanged: enabled ? onChanged : null,
-        validator: (value) {
-          if (value == null || value == -1) {
-            return 'Elegí una categoría';
-          }
-          return null;
-        },
-      ),
+          items: [
+            ...categories.map(_buildItem),
+            const DropdownMenuItem<int>(
+              value: -1,
+              child: Row(
+                children: [
+                  Icon(Icons.add_circle_outline, size: 20),
+                  SizedBox(width: 8),
+                  Text('Crear nueva categoría'),
+                ],
+              ),
+            ),
+          ],
+          onChanged: enabled ? onChanged : null,
+          validator: (value) {
+            if (value == null || value == -1) {
+              return 'Elegí una categoría';
+            }
+            return null;
+          },
+        );
+      },
     );
   }
 

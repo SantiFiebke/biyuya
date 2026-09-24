@@ -14,6 +14,28 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'router_provider.g.dart';
 
+/// Deep link objetivo guardado hasta que la sesión resuelva (cold start).
+///
+/// [AuthSessionController] arranca en `loading`; si navegáramos en ese momento
+/// el redirect manda a splash y el target se pierde. El redirect consume este
+/// valor una vez que hay usuario + household.
+@Riverpod(keepAlive: true)
+class PendingDeepLink extends _$PendingDeepLink {
+  @override
+  String? build() => null;
+
+  String? get target => state;
+
+  set target(String? value) => state = value;
+
+  /// Devuelve el target pendiente y lo limpia (una sola vez).
+  String? consume() {
+    final target = state;
+    state = null;
+    return target;
+  }
+}
+
 /// Notifier que retransmite los cambios del AuthSessionController a GoRouter
 class RouterRefreshNotifier extends ChangeNotifier {
   RouterRefreshNotifier(Ref ref) {
@@ -21,13 +43,15 @@ class RouterRefreshNotifier extends ChangeNotifier {
   }
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 GoRouter router(Ref ref) {
   final refreshNotifier = RouterRefreshNotifier(ref);
 
   return GoRouter(
     initialLocation: AppRoute.splash.path,
     refreshListenable: refreshNotifier,
+    errorBuilder: (context, state) =>
+        const Scaffold(body: Center(child: Text('No se pudo abrir el enlace'))),
     routes: [
       // ── Top-level routes (fuera del shell) ──
       GoRoute(
@@ -86,7 +110,11 @@ GoRouter router(Ref ref) {
                 routes: [
                   GoRoute(
                     path: 'new',
-                    builder: (context, state) => const ExpenseFormView(),
+                    builder: (context, state) => ExpenseFormView(
+                      initialCategoryId: int.tryParse(
+                        state.uri.queryParameters['categoryId'] ?? '',
+                      ),
+                    ),
                   ),
                   GoRoute(
                     path: ':id/edit',
@@ -162,7 +190,14 @@ GoRouter router(Ref ref) {
                 : AppRoute.onboarding.path;
           }
 
-          // 3. With valid session and household
+          // 3. Consume pending deep link (survives login/onboarding). Returning
+          // the current location when pending == loc is a no-op for GoRouter.
+          final pending = ref.read(pendingDeepLinkProvider.notifier).consume();
+          if (pending != null) {
+            return pending;
+          }
+
+          // 4. With valid session and household
           if (isLoggingIn ||
               isRegistering ||
               isVerifyingEmail ||

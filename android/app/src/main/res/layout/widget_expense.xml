@@ -4,77 +4,87 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/widget_background"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:paddingHorizontal="16dp"
     android:paddingVertical="12dp">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingEnd="12dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/widget_daily_total"
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingEnd="12dp">
+
+            <TextView
+                android:id="@+id/widget_daily_total"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.05"
+                android:maxLines="1"
+                android:text="GASTADO HOY"
+                android:textColor="#81C784"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/widget_amount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-bold"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:singleLine="true"
+                android:text="$2.555.999"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                app:autoSizeMaxTextSize="20sp"
+                app:autoSizeMinTextSize="12sp"
+                app:autoSizeStepGranularity="1sp"
+                app:autoSizeTextType="uniform" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_add_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.05"
-            android:maxLines="1"
-            android:text="GASTADO HOY"
-            android:textColor="#81C784"
-            android:textSize="10sp" />
+            android:background="@drawable/widget_button_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="10dp">
 
-        <TextView
-            android:id="@+id/widget_amount"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-bold"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:singleLine="true"
-            android:text="$2.555.999"
-            android:textColor="#FFFFFF"
-            android:textSize="20sp"
-            app:autoSizeMaxTextSize="20sp"
-            app:autoSizeMinTextSize="12sp"
-            app:autoSizeStepGranularity="1sp"
-            app:autoSizeTextType="uniform" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-bold"
+                android:includeFontPadding="false"
+                android:text="+ Nuevo gasto"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
-        android:id="@+id/widget_add_button"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/widget_button_bg"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="10dp">
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/widget_category_row"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-bold"
-            android:includeFontPadding="false"
-            android:text="+"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:fontFamily="sans-serif-medium"
-            android:includeFontPadding="false"
-            android:text="Añadir"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
     </LinearLayout>
 
 </LinearLayout>

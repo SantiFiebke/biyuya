@@ -467,4 +467,94 @@ void main() {
       },
     );
   });
+
+  group('ExpenseFormView - category prefill', () {
+    DropdownButtonFormField<int> dropdown(WidgetTester tester) =>
+        tester.widget<DropdownButtonFormField<int>>(
+          find.byType(DropdownButtonFormField<int>),
+        );
+
+    testWidgets('prefills matching category from initialCategoryId', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseFormView(initialCategoryId: 2),
+          overrides: _baseOverrides(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(dropdown(tester).initialValue, 2);
+      expect(find.text('Transport'), findsOneWidget);
+    });
+
+    testWidgets('ignores unknown initialCategoryId without crashing', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseFormView(initialCategoryId: 9999),
+          overrides: _baseOverrides(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(dropdown(tester).initialValue, isNull);
+      expect(find.text('Seleccionar categoría'), findsOneWidget);
+    });
+
+    testWidgets('starts empty without initialCategoryId or expense', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(child: const ExpenseFormView(), overrides: _baseOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(dropdown(tester).initialValue, isNull);
+    });
+
+    testWidgets('edit mode prefills category from expense', (tester) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: ExpenseFormView(expense: _testExpense),
+          overrides: _baseOverrides(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(dropdown(tester).initialValue, 2);
+      expect(find.text('Transport'), findsOneWidget);
+    });
+
+    testWidgets('didUpdateWidget re-prefills when initialCategoryId changes', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseFormView(initialCategoryId: 1),
+          overrides: _baseOverrides(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(dropdown(tester).initialValue, 1);
+      expect(find.text('Food'), findsOneWidget);
+
+      // Same tree, new config -> didUpdateWidget fires, selection resets.
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseFormView(initialCategoryId: 2),
+          overrides: _baseOverrides(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(dropdown(tester).initialValue, 2);
+      expect(find.text('Transport'), findsOneWidget);
+      expect(find.text('Food'), findsNothing);
+    });
+  });
 }

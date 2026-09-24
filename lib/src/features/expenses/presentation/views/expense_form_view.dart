@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/category_dropdown.dart';
@@ -14,9 +16,12 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 class ExpenseFormView extends ConsumerStatefulWidget {
-  const ExpenseFormView({super.key, this.expense});
+  const ExpenseFormView({super.key, this.expense, this.initialCategoryId});
 
   final Expense? expense;
+
+  /// Categoría a prefillear cuando se llega por deep link (`?categoryId=`).
+  final int? initialCategoryId;
 
   @override
   ConsumerState<ExpenseFormView> createState() => _ExpenseFormViewState();
@@ -46,8 +51,19 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
     _descriptionController = TextEditingController(
       text: expense?.description ?? '',
     );
-    _selectedCategoryId = expense?.categoryId;
+    _selectedCategoryId = expense?.categoryId ?? widget.initialCategoryId;
     _selectedDate = expense?.date ?? DateTime.now();
+  }
+
+  @override
+  void didUpdateWidget(covariant ExpenseFormView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialCategoryId != oldWidget.initialCategoryId) {
+      setState(() {
+        _selectedCategoryId =
+            widget.expense?.categoryId ?? widget.initialCategoryId;
+      });
+    }
   }
 
   @override
@@ -112,6 +128,24 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Clear a stale selection (e.g. deep-link categoryId that no longer
+    // exists) once categories finish loading. Registered in build, not
+    // initState, so the first frame is not lost.
+    ref.listen<AsyncValue<List<Category>>>(categoryControllerProvider, (
+      previous,
+      next,
+    ) {
+      final categories = next.value;
+      final selected = _selectedCategoryId;
+      if (categories == null || selected == null) {
+        return;
+      }
+      if (categories.any((category) => category.id == selected)) {
+        return;
+      }
+      setState(() => _selectedCategoryId = null);
+    });
 
     return Scaffold(
       appBar: AppBar(
