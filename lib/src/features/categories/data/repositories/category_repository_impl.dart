@@ -43,6 +43,7 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
     String? color,
     String? icon,
     double? budgetAmount,
+    bool isExpense = true,
   }) async {
     try {
       final data = await _client
@@ -53,6 +54,7 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
             'icon': icon,
             'household_id': householdId,
             'budget_amount': budgetAmount,
+            'is_expense': isExpense,
           })
           .select()
           .single()
@@ -71,6 +73,7 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
     String? color,
     String? icon,
     double? budgetAmount,
+    bool isExpense = true,
   }) async {
     try {
       final data = await _client
@@ -80,6 +83,7 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
             'color': color,
             'icon': icon,
             'budget_amount': budgetAmount,
+            'is_expense': isExpense,
           })
           .eq('id', id)
           .select()

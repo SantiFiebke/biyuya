@@ -19,6 +19,6 @@ abstract class SettingsRepositoryBase {
 
   /// Persiste la configuración del usuario actual.
   Future<Result<void, SettingsFailure>> saveSettings({
-    required bool debtSettlementEnabled,
+    required UserSettings settings,
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/dialogs/confirm_action_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
@@ -15,6 +17,7 @@ import 'package:biyuya/src/features/categories/presentation/controllers/category
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/domain/utils/duplicate_detection.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/presentation/controllers/expense_list_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/category_filter_sheet.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/debt_settlement_sheet.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/member_filter_sheet.dart';
@@ -38,14 +41,80 @@ class ExpenseListView extends ConsumerStatefulWidget {
 }
 
 class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
+  final ScrollController _scrollController = ScrollController();
+
   int? _selectedCategoryId;
   DateTimeRange? _dateRange;
   String? _selectedUserUuid;
+
+  /// El controller auto-refresca al construirse y no expone flag de loading,
+  /// así que el view re-emite refresh() (en un microtask posterior al del
+  /// controller) y lo espera para saber cuándo llegó la primera página.
+  /// ponytail: el guard de epoch del controller descarta su carga en vuelo —
+  /// sin request extra, solo una segunda lectura del outbox.
+  bool _initialLoadStarted = false;
+  bool _initialLoadDone = false;
 
   bool get _hasActiveFilters =>
       _selectedCategoryId != null ||
       _dateRange != null ||
       _selectedUserUuid != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_loadMoreNearBottom);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_loadMoreNearBottom)
+      ..dispose();
+    super.dispose();
+  }
+
+  /// Pide la siguiente página cuando el usuario está a ~300px del final.
+  /// `loadMore` es no-op sin `hasMore` o con una carga en vuelo, así que
+  /// llamar de más es seguro.
+  void _loadMoreNearBottom() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    final position = _scrollController.position;
+    if (position.pixels < position.maxScrollExtent - 300) {
+      return;
+    }
+    unawaited(ref.read(expenseListControllerProvider.notifier).loadMore());
+  }
+
+  Future<void> _refresh() {
+    return ref.read(expenseListControllerProvider.notifier).refresh();
+  }
+
+  void _startInitialLoad() {
+    if (_initialLoadStarted) {
+      return;
+    }
+    _initialLoadStarted = true;
+    // Vuelta a la pantalla con página ya cargada: no recargar.
+    if (ref.read(expenseListControllerProvider).items.isNotEmpty) {
+      _initialLoadDone = true;
+      return;
+    }
+    unawaited(Future.microtask(_settleInitialLoad));
+  }
+
+  Future<void> _settleInitialLoad() async {
+    if (!mounted) {
+      return;
+    }
+    await _refresh();
+    if (!mounted || _initialLoadDone) {
+      return;
+    }
+    setState(() => _initialLoadDone = true);
+  }
 
   void _clearFilters() {
     setState(() {
@@ -53,13 +122,28 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
       _dateRange = null;
       _selectedUserUuid = null;
     });
+    unawaited(ref.read(expenseListControllerProvider.notifier).clearFilters());
+  }
+
+  void _onCategorySelected(int? id) {
+    if (id == _selectedCategoryId) {
+      return;
+    }
+    setState(() => _selectedCategoryId = id);
+    final notifier = ref.read(expenseListControllerProvider.notifier);
+    if (id == null) {
+      unawaited(notifier.setFilters(clearCategory: true));
+    } else {
+      unawaited(notifier.setFilters(categoryId: id));
+    }
   }
 
   Future<void> _showCategoryFilter(BuildContext context) async {
     await showCategoryFilterSheet(
       context,
       ref,
-      onSelected: (id) => setState(() => _selectedCategoryId = id),
+      selectedCategoryId: _selectedCategoryId,
+      onSelected: _onCategorySelected,
     );
   }
 
@@ -69,9 +153,25 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
-      setState(() => _dateRange = picked);
+    if (picked == null) {
+      return;
     }
+    setState(() => _dateRange = picked);
+    // `lte` es inclusivo: cerrar el rango al final del día elegido, igual que
+    // el filtro in-memory viejo (`isBefore(end + 1 día)`).
+    final endDate = DateTime(
+      picked.end.year,
+      picked.end.month,
+      picked.end.day,
+      23,
+      59,
+      59,
+    );
+    unawaited(
+      ref
+          .read(expenseListControllerProvider.notifier)
+          .setFilters(startDate: picked.start, endDate: endDate),
+    );
   }
 
   Future<void> _showMemberFilter(
@@ -83,7 +183,16 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
       members: members,
       selectedUuid: _selectedUserUuid,
     );
+    if (result == _selectedUserUuid) {
+      return;
+    }
     setState(() => _selectedUserUuid = result);
+    final notifier = ref.read(expenseListControllerProvider.notifier);
+    if (result == null) {
+      unawaited(notifier.setFilters(clearUser: true));
+    } else {
+      unawaited(notifier.setFilters(userUuid: result));
+    }
   }
 
   Future<void> _showDebtSettlement() async {
@@ -94,50 +203,28 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     await showDebtSettlementSheet(context, transfers: transfers);
   }
 
-  List<Expense> _filterExpenses(List<Expense> expenses) {
-    var filtered = expenses;
-
-    if (_selectedCategoryId != null) {
-      filtered = filtered
-          .where((e) => e.categoryId == _selectedCategoryId)
-          .toList();
+  Future<void> _retrySync() async {
+    await ref.read(expenseControllerProvider.notifier).retrySync();
+    if (!mounted) {
+      return;
     }
-
-    if (_dateRange != null) {
-      filtered = filtered
-          .where(
-            (e) =>
-                e.date.isAfter(_dateRange!.start) &&
-                e.date.isBefore(_dateRange!.end.add(const Duration(days: 1))),
-          )
-          .toList();
-    }
-
-    if (_selectedUserUuid != null) {
-      filtered = filtered
-          .where((e) => e.userUuid == _selectedUserUuid)
-          .toList();
-    }
-
-    return filtered;
+    await _refresh();
   }
 
   @override
   Widget build(BuildContext context) {
-    final asyncExpenses = ref.watch(expenseControllerProvider);
+    final listState = ref.watch(expenseListControllerProvider);
+    _startInitialLoad();
+
     final asyncMembers = ref.watch(householdMembersProvider);
     final members = asyncMembers.value ?? [];
     final categories = ref.watch(categoryControllerProvider).value ?? [];
 
-    ref.listen<AsyncValue<List<Expense>>>(expenseControllerProvider, (
-      _,
-      state,
-    ) {
-      state.whenOrNull(
-        error: (error, _) {
-          context.showErrorSnackBar(error.toString());
-        },
-      );
+    ref.listen(expenseListControllerProvider, (previous, next) {
+      final error = next.error;
+      if (error != null && error != previous?.error) {
+        context.showErrorSnackBar(error.toString());
+      }
     });
 
     // Safety reset: orphaned user filter
@@ -152,13 +239,21 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
       if (_selectedUserUuid != null &&
           (!selectedExists || currentMembers.length <= 1)) {
         setState(() => _selectedUserUuid = null);
+        unawaited(
+          ref
+              .read(expenseListControllerProvider.notifier)
+              .setFilters(clearUser: true),
+        );
       }
     });
 
     final showMemberChip = asyncMembers.hasValue && members.length > 1;
     final debtSettlementEnabled =
         ref.watch(settingsControllerProvider).value?.debtSettlementEnabled ??
-        true;
+        false;
+    final hasPendingSync = listState.items.any(
+      (e) => e.syncStatus != ExpenseSyncStatus.synced,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -174,7 +269,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
       ),
       body: Column(
         children: [
-          // 1. Filter bar
+          // 1. Filter bar (chips espejo de los filtros server-side)
           FilterBar(
             selectedCategoryId: _selectedCategoryId,
             dateRange: _dateRange,
@@ -189,97 +284,51 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
           ),
 
           // 2. Retry sync (only when there is something pending)
-          if (asyncExpenses.value?.any(
-                (e) => e.syncStatus != ExpenseSyncStatus.synced,
-              ) ??
-              false)
+          if (hasPendingSync)
             Align(
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: TextButton.icon(
-                  onPressed: () =>
-                      ref.read(expenseControllerProvider.notifier).retrySync(),
+                  onPressed: () => unawaited(_retrySync()),
                   icon: const Icon(Icons.sync, size: 16),
                   label: const Text('Reintentar sync'),
                 ),
               ),
             ),
 
-          // 3. List or skeleton / empty
+          // 3. List / empty / error, con pull-to-refresh
           Expanded(
-            child: asyncExpenses.when(
-              loading: () => const _ExpenseSkeleton(),
-              error: (_, _) => ErrorView(
-                message: 'No se pudieron cargar los gastos',
-                retryLabel: 'Reintentar',
-                onRetry: () => ref.invalidate(expenseControllerProvider),
-              ),
-              data: (expenses) {
-                final filtered = _filterExpenses(expenses);
-
-                if (filtered.isEmpty) {
-                  return EmptyView(
-                    title: 'No hay gastos',
-                    message: 'Probá cambiar los filtros o registrá un gasto',
-                    actionLabel: 'Registrar gasto',
-                    onAction: () => context.push(AppRoute.expenseNew.path),
-                  );
-                }
-
-                // 2a. Duplicates (computed once per list, not per tile)
-                final duplicateIds = findDuplicateExpenseIds(filtered);
-
-                // 2b. Summary
-                final total = filtered.fold<double>(
-                  0,
-                  (sum, e) => sum + e.amount,
-                );
-                final expenseColor = Theme.of(
-                  context,
-                ).extension<AppColors>()?.expense;
-
-                // 2c. List
-                return Column(
-                  children: [
-                    SummaryCard(
-                      count: filtered.length,
-                      total: total,
-                      expenseColor: expenseColor,
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 2),
-                        itemBuilder: (context, index) {
-                          final expense = filtered[index];
-                          final category = categories
-                              .cast<Category?>()
-                              .firstWhere(
-                                (c) => c?.id == expense.categoryId,
-                                orElse: () => null,
-                              );
-                          return ExpenseListTile(
-                            expense: expense,
-                            category: category,
-                            isDuplicate: duplicateIds.contains(expense.id),
-                            onTap: () => context.push(
-                              AppRoute.expenseEdit(expense.id.toString()),
-                              extra: expense,
-                            ),
-                            onDelete: () =>
-                                _confirmDelete(context, ref, expense),
-                          );
-                        },
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: listState.error != null && listState.items.isEmpty
+                  ? ErrorView(
+                      message: 'No se pudieron cargar los gastos',
+                      retryLabel: 'Reintentar',
+                      onRetry: () => unawaited(_refresh()),
+                    )
+                  : listState.items.isEmpty
+                  ? (_initialLoadDone
+                        ? EmptyView(
+                            title: 'Todavía no hay gastos',
+                            message: 'Registrá tu primer gasto para empezar',
+                            actionLabel: 'Registrar gasto',
+                            onAction: () =>
+                                context.push(AppRoute.expenseNew.path),
+                          )
+                        : const _ExpenseSkeleton())
+                  : _ExpenseListBody(
+                      expenses: listState.items,
+                      categories: categories,
+                      isLoadingMore: listState.isLoadingMore,
+                      scrollController: _scrollController,
+                      onTap: (expense) => context.push(
+                        AppRoute.expenseEdit(expense.id.toString()),
+                        extra: expense,
                       ),
+                      onDelete: (expense) =>
+                          _confirmDelete(context, ref, expense),
                     ),
-                  ],
-                );
-              },
             ),
           ),
         ],
@@ -314,6 +363,9 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
       final ok = await ref
           .read(expenseControllerProvider.notifier)
           .deleteExpense(id: expense.id);
+      if (ok) {
+        await ref.read(expenseListControllerProvider.notifier).refresh();
+      }
       if (ok && context.mounted) {
         context.showSuccessSnackBar('Gasto eliminado');
       }
@@ -461,49 +513,63 @@ class _FilterChipItem extends StatelessWidget {
   }
 }
 
-class SummaryCard extends StatelessWidget {
-  const SummaryCard({
-    required this.count,
-    required this.total,
-    this.expenseColor,
-    super.key,
+/// Lista paginada: tiles + footer con spinner mientras `isLoadingMore`.
+class _ExpenseListBody extends StatelessWidget {
+  const _ExpenseListBody({
+    required this.expenses,
+    required this.categories,
+    required this.isLoadingMore,
+    required this.scrollController,
+    required this.onTap,
+    required this.onDelete,
   });
 
-  final int count;
-  final double total;
-  final Color? expenseColor;
+  final List<Expense> expenses;
+  final List<Category> categories;
+  final bool isLoadingMore;
+  final ScrollController scrollController;
+  final ValueChanged<Expense> onTap;
+  final ValueChanged<Expense> onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // Duplicados sobre lo cargado hasta ahora: cada página agregada los
+    // re-evalúa (barato) y el badge solo cubre lo visible.
+    final duplicateIds = findDuplicateExpenseIds(expenses);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              '$count ${count == 1 ? 'movimiento' : 'movimientos'}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return ListView.separated(
+      controller: scrollController,
+      // Siempre scrolleable: pull-to-refresh aunque quepa en pantalla.
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: expenses.length + (isLoadingMore ? 1 : 0),
+      separatorBuilder: (_, _) => const SizedBox(height: 2),
+      itemBuilder: (context, index) {
+        if (index >= expenses.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-            const Spacer(),
-            AmountText(
-              amount: total,
-              color: expenseColor,
-              style: theme.textTheme.titleMedium,
-            ),
-          ],
-        ),
-      ),
+          );
+        }
+        final expense = expenses[index];
+        final category = categories.cast<Category?>().firstWhere(
+          (c) => c?.id == expense.categoryId,
+          orElse: () => null,
+        );
+        return ExpenseListTile(
+          expense: expense,
+          category: category,
+          isDuplicate: duplicateIds.contains(expense.id),
+          onTap: () => onTap(expense),
+          onDelete: () => onDelete(expense),
+        );
+      },
     );
   }
 }

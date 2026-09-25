@@ -26,6 +26,22 @@ abstract class ExpenseRepositoryBase {
     required int month,
   });
 
+  /// Obtiene una página de gastos del household (server-side pagination),
+  /// ordenada por fecha descendente, con filtros opcionales.
+  ///
+  /// Implementación por defecto: devuelve error. Los repositorios concretos
+  /// la sobreescriben; el cuerpo evita romper las subclases de solo lectura
+  /// (fakes) al crecer el contrato.
+  Future<Result<List<Expense>, ExpenseFailure>> getExpensesPage({
+    required int householdId,
+    required int limit,
+    required int offset,
+    int? categoryId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? userUuid,
+  }) async => const Error(ExpenseFailure('getExpensesPage no implementado'));
+
   /// Crea un nuevo gasto
   Future<Result<Expense, ExpenseFailure>> createExpense({
     required double amount,

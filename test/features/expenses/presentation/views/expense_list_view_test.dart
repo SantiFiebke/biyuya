@@ -7,6 +7,7 @@ import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/presentation/controllers/expense_list_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/views/expense_list_view.dart';
 import 'package:biyuya/src/features/settings/domain/entities/user_settings.dart';
 import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
@@ -71,6 +72,97 @@ Override _emptyMembersOverride() => householdMembersProvider.overrideWithValue(
   const AsyncData<List<UserProfile>>([]),
 );
 
+/// In-memory stand-in for the paginated controller: applies filters against
+/// the source list the way the server would, so server-side filtering is
+/// observable in widget tests without touching Supabase.
+///
+/// Holds the caller's list by reference so a shared fake (delete tests) can
+/// mutate it and `refresh()` re-reads the change.
+class _FakeExpenseListController extends ExpenseListController {
+  _FakeExpenseListController(this._source);
+
+  final List<Expense> _source;
+  int? _categoryId;
+  String? _userUuid;
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  /// When true, [loadMore] flips `isLoadingMore` (footer spinner) and keeps it
+  /// until the next refresh, so tests can observe the loading state.
+  bool simulateLoadMore = false;
+
+  int loadMoreCalls = 0;
+
+  List<Expense> _filtered() => _source.where((e) {
+    if (_categoryId != null && e.categoryId != _categoryId) {
+      return false;
+    }
+    if (_userUuid != null && e.userUuid != _userUuid) {
+      return false;
+    }
+    if (_startDate != null && e.date.isBefore(_startDate!)) {
+      return false;
+    }
+    if (_endDate != null && e.date.isAfter(_endDate!)) {
+      return false;
+    }
+    return true;
+  }).toList();
+
+  @override
+  ExpenseListState build() => ExpenseListState(items: _filtered());
+
+  @override
+  Future<void> refresh() async {
+    state = ExpenseListState(items: _filtered());
+  }
+
+  @override
+  Future<void> loadMore() async {
+    loadMoreCalls++;
+    if (simulateLoadMore) {
+      state = state.copyWith(isLoadingMore: true);
+    }
+  }
+
+  @override
+  Future<void> setFilters({
+    int? categoryId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? userUuid,
+    bool clearCategory = false,
+    bool clearDates = false,
+    bool clearUser = false,
+  }) async {
+    if (clearCategory) {
+      _categoryId = null;
+    } else if (categoryId != null) {
+      _categoryId = categoryId;
+    }
+    if (clearDates) {
+      _startDate = null;
+      _endDate = null;
+    } else {
+      _startDate = startDate ?? _startDate;
+      _endDate = endDate ?? _endDate;
+    }
+    if (clearUser) {
+      _userUuid = null;
+    } else if (userUuid != null) {
+      _userUuid = userUuid;
+    }
+    state = ExpenseListState(items: _filtered());
+  }
+
+  @override
+  Future<void> clearFilters() =>
+      setFilters(clearCategory: true, clearDates: true, clearUser: true);
+}
+
+Override _listOverride(List<Expense> expenses) => expenseListControllerProvider
+    .overrideWith(() => _FakeExpenseListController(expenses));
+
 void main() {
   setUpAll(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -89,6 +181,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(_testExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
@@ -110,6 +203,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(_testExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
@@ -133,6 +227,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(_testExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
@@ -168,6 +263,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(_testExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
@@ -194,6 +290,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(_testExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
@@ -216,6 +313,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(const []),
             expenseControllerProvider.overrideWithValue(
               const AsyncData<List<Expense>>([]),
             ),
@@ -226,8 +324,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('No hay gastos'), findsOneWidget);
+      expect(find.text('Todavía no hay gastos'), findsOneWidget);
       expect(find.text('Registrar gasto'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Registrar gasto'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('shows FAB for creating new expense', (tester) async {
@@ -238,6 +340,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(_testExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
@@ -250,6 +353,54 @@ void main() {
 
       expect(find.byType(FloatingActionButton), findsOneWidget);
       expect(find.byIcon(Icons.add), findsOneWidget);
+    });
+
+    testWidgets('scrolling to the bottom triggers loadMore footer spinner', (
+      tester,
+    ) async {
+      // Enough rows to overflow the viewport so a drag actually scrolls.
+      final many = List.generate(
+        20,
+        (i) => Expense(
+          id: i + 1,
+          amount: 10,
+          date: DateTime(2025, 7, (i % 28) + 1),
+          description: 'Item $i',
+          householdId: 1,
+          categoryId: 1,
+          userUuid: 'user-1',
+          createdAt: DateTime(2025, 7),
+        ),
+      );
+
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseListControllerProvider.overrideWith(
+              () => _FakeExpenseListController(many)..simulateLoadMore = true,
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(many),
+            ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // Drag to the end: ScrollController listener fires loadMore near bottom.
+      await tester.drag(find.byType(ListView), const Offset(0, -2000));
+      // Indeterminate spinner never settles: pump frames manually.
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
     testWidgets('"Liquidar deudas" opens debt settlement sheet', (
@@ -300,6 +451,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(currentMonthExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(currentMonthExpenses),
             ),
@@ -330,6 +482,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride(_testExpenses),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
@@ -418,6 +571,7 @@ void main() {
       categoryControllerProvider.overrideWithValue(
         AsyncData<List<Category>>(_testCategories),
       ),
+      _listOverride(expenses ?? multiUserExpenses),
       expenseControllerProvider.overrideWithValue(
         AsyncData<List<Expense>>(expenses ?? multiUserExpenses),
       ),
@@ -482,7 +636,7 @@ void main() {
       expect(find.text('Alice Smith'), findsOneWidget);
       expect(find.text('Bob Jones'), findsOneWidget);
 
-      // Select Bob → only his expense remains
+      // Select Bob → only his expense remains (server-side filter via fake)
       await tester.tap(find.text('Bob Jones'));
       await tester.pumpAndSettle();
 
@@ -558,16 +712,25 @@ void main() {
 
       expect(find.text('Bus ticket'), findsOneWidget);
 
-      // Simulate member list shrinking to 1 by overriding the provider
+      // Simulate member list shrinking to 1 by overriding the providers.
+      // Fresh list-controller fake: unfiltered source, filter cleared.
       container.updateOverrides([
         categoryControllerProvider.overrideWithValue(
           AsyncData<List<Category>>(_testCategories),
         ),
+        _listOverride(multiUserExpenses),
         expenseControllerProvider.overrideWithValue(
           AsyncData<List<Expense>>(multiUserExpenses),
         ),
         householdMembersProvider.overrideWithValue(
-          AsyncData<List<UserProfile>>(singleMember),
+          const AsyncData<List<UserProfile>>([
+            UserProfile(
+              id: 'user-1',
+              name: 'Alice',
+              lastName: 'Smith',
+              householdId: '1',
+            ),
+          ]),
         ),
         _settingsOverride(),
       ]);
@@ -583,28 +746,27 @@ void main() {
 
   group('ExpenseTile actions menu', () {
     List<Override> baseOverrides({
-      List<Expense>? expenses,
-      ExpenseController Function()? controller,
+      required List<Expense> source,
+      required ExpenseController Function() controller,
     }) => [
       categoryControllerProvider.overrideWithValue(
         AsyncData<List<Category>>(_testCategories),
       ),
-      if (controller != null)
-        expenseControllerProvider.overrideWith(controller)
-      else
-        expenseControllerProvider.overrideWithValue(
-          AsyncData<List<Expense>>(expenses ?? _testExpenses),
-        ),
+      // Same source instance: the recording controller mutates it on delete
+      // and the list fake re-reads it on the view's post-delete refresh().
+      _listOverride(source),
+      expenseControllerProvider.overrideWith(controller),
       _settingsOverride(),
       _emptyMembersOverride(),
     ];
 
     testWidgets('shows edit and delete menu items', (tester) async {
-      final fake = _RecordingExpenseController(_testExpenses);
+      final source = List<Expense>.of(_testExpenses);
+      final fake = _RecordingExpenseController(source);
       await tester.pumpWidget(
         wrapTest(
           child: const ExpenseListView(),
-          overrides: baseOverrides(controller: () => fake),
+          overrides: baseOverrides(source: source, controller: () => fake),
         ),
       );
       await tester.pumpAndSettle();
@@ -620,11 +782,12 @@ void main() {
     });
 
     testWidgets('tapping delete opens confirmation dialog', (tester) async {
-      final fake = _RecordingExpenseController(_testExpenses);
+      final source = List<Expense>.of(_testExpenses);
+      final fake = _RecordingExpenseController(source);
       await tester.pumpWidget(
         wrapTest(
           child: const ExpenseListView(),
-          overrides: baseOverrides(controller: () => fake),
+          overrides: baseOverrides(source: source, controller: () => fake),
         ),
       );
       await tester.pumpAndSettle();
@@ -642,11 +805,12 @@ void main() {
     testWidgets('confirming delete records id and removes expense', (
       tester,
     ) async {
-      final fake = _RecordingExpenseController(_testExpenses);
+      final source = List<Expense>.of(_testExpenses);
+      final fake = _RecordingExpenseController(source);
       await tester.pumpWidget(
         wrapTest(
           child: const ExpenseListView(),
-          overrides: baseOverrides(controller: () => fake),
+          overrides: baseOverrides(source: source, controller: () => fake),
         ),
       );
       await tester.pumpAndSettle();
@@ -666,11 +830,12 @@ void main() {
     });
 
     testWidgets('cancelling delete records nothing', (tester) async {
-      final fake = _RecordingExpenseController(_testExpenses);
+      final source = List<Expense>.of(_testExpenses);
+      final fake = _RecordingExpenseController(source);
       await tester.pumpWidget(
         wrapTest(
           child: const ExpenseListView(),
-          overrides: baseOverrides(controller: () => fake),
+          overrides: baseOverrides(source: source, controller: () => fake),
         ),
       );
       await tester.pumpAndSettle();
@@ -715,6 +880,7 @@ void main() {
       categoryControllerProvider.overrideWithValue(
         AsyncData<List<Category>>(_testCategories),
       ),
+      _listOverride(expenses),
       expenseControllerProvider.overrideWithValue(
         AsyncData<List<Expense>>(expenses),
       ),
@@ -945,6 +1111,7 @@ void main() {
             categoryControllerProvider.overrideWithValue(
               AsyncData<List<Category>>(_testCategories),
             ),
+            _listOverride([duplicateA, duplicateB, unique]),
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>([duplicateA, duplicateB, unique]),
             ),
@@ -975,18 +1142,21 @@ void main() {
 }
 
 class _RecordingExpenseController extends ExpenseController {
-  _RecordingExpenseController(this._initial);
+  _RecordingExpenseController(this.source);
 
-  final List<Expense> _initial;
+  /// Shared with the list fake: deleting mutates the same list the paginated
+  /// controller re-reads on the view's post-delete refresh().
+  final List<Expense> source;
   final List<int> deletedIds = [];
 
   @override
-  AsyncValue<List<Expense>> build() => AsyncData(_initial);
+  AsyncValue<List<Expense>> build() => AsyncData(List.of(source));
 
   @override
   Future<bool> deleteExpense({required int id}) async {
     deletedIds.add(id);
-    state = AsyncData((state.value ?? []).where((e) => e.id != id).toList());
+    source.removeWhere((e) => e.id == id);
+    state = AsyncData(List.of(source));
     return true;
   }
 }

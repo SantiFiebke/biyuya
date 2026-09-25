@@ -12,9 +12,12 @@ import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart'
 import 'package:biyuya/src/features/reports/domain/insights.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/category_expenses_sheet.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/insight_comparison_sheet.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/insights_section.dart';
+import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -60,9 +63,11 @@ class ReportView extends ConsumerWidget {
         ),
         data: (report) {
           if (report == null) {
-            return const EmptyView(
-              title: 'No hay datos para este mes',
-              message: 'Registrá gastos para ver tu reporte',
+            return EmptyView(
+              title: 'Sin datos este mes',
+              message: 'Registrá gastos para ver tus reportes',
+              actionLabel: 'Registrar gasto',
+              onAction: () => context.push(AppRoute.expenseNew.path),
             );
           }
           // report no-null acá (guard arriba): insights del mes vs anterior.
@@ -80,6 +85,16 @@ class ReportView extends ConsumerWidget {
                 ),
               );
             },
+            onInsightTap: (insight) {
+              unawaited(
+                InsightComparisonSheet.show(
+                  context,
+                  insight: insight,
+                  year: report.year,
+                  month: report.month,
+                ),
+              );
+            },
           );
         },
       ),
@@ -92,20 +107,30 @@ class ReportContent extends StatelessWidget {
     required this.report,
     required this.insights,
     required this.onCategoryTap,
+    this.onInsightTap,
     super.key,
   });
 
   final MonthlyReport report;
   final List<Insight> insights;
   final void Function(CategoryBreakdown breakdown) onCategoryTap;
+  final void Function(Insight insight)? onInsightTap;
 
   @override
   Widget build(BuildContext context) {
     // Desglose puede incluir categorías solo del mes anterior (amount 0):
     // tiles/empty-state solo muestran gastos del mes actual.
-    final visibleBreakdowns = report.categoryBreakdowns
-        .where((breakdown) => breakdown.amount > 0)
-        .toList();
+    // No-gastos van al final (amount desc); gastos primero (amount desc).
+    final visibleBreakdowns =
+        report.categoryBreakdowns
+            .where((breakdown) => breakdown.amount > 0)
+            .toList()
+          ..sort((a, b) {
+            if (a.isExpense != b.isExpense) {
+              return a.isExpense ? -1 : 1;
+            }
+            return b.amount.compareTo(a.amount);
+          });
     // Mes sin gasto genera insights -100% (ruido) → no mostrar sección.
     final showInsights = report.total > 0 && insights.isNotEmpty;
     return SingleChildScrollView(
@@ -142,7 +167,7 @@ class ReportContent extends StatelessWidget {
             ),
           if (showInsights) ...[
             const SizedBox(height: 24),
-            InsightsSection(insights: insights),
+            InsightsSection(insights: insights, onInsightTap: onInsightTap),
           ],
         ],
       ),
@@ -279,14 +304,45 @@ class CategoryBreakdownTile extends StatelessWidget {
           ListTile(
             onTap: onTap,
             leading: CategoryAvatar(icon: icon, color: color),
-            title: Text(breakdown.categoryName),
-            subtitle: Text('${breakdown.percentage.toStringAsFixed(1)}%'),
+            title: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(breakdown.categoryName),
+                if (!breakdown.isExpense) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'No es gasto',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            subtitle: breakdown.isExpense
+                ? Text('${breakdown.percentage.toStringAsFixed(1)}%')
+                : null,
             trailing: AmountText(
               amount: breakdown.amount,
               style: Theme.of(context).textTheme.titleSmall,
+              color: breakdown.isExpense
+                  ? null
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          if (hasBudget)
+          if (hasBudget && breakdown.isExpense)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               child: Column(

@@ -9,6 +9,7 @@ class CategoryModel extends Category {
     super.color,
     super.icon,
     super.budgetAmount,
+    super.isExpense,
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +21,7 @@ class CategoryModel extends Category {
       householdId: (json['household_id'] as num).toInt(),
       createdAt: DateTime.parse(json['created_at'] as String),
       budgetAmount: (json['budget_amount'] as num?)?.toDouble(),
+      isExpense: (json['is_expense'] as bool?) ?? true,
     );
   }
 
@@ -30,6 +32,7 @@ class CategoryModel extends Category {
       'icon': icon,
       'household_id': householdId,
       'budget_amount': budgetAmount,
+      'is_expense': isExpense,
     };
   }
 }

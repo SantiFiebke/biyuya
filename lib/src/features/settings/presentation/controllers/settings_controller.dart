@@ -35,15 +35,33 @@ class SettingsController extends _$SettingsController {
     );
   }
 
-  Future<void> toggle({required bool enabled}) async {
+  /// Optimistic update + rollback on error, single write path for all flags.
+  Future<void> _save(UserSettings next) async {
     _touched = true;
     final previous = state.value ?? const UserSettings();
-    state = AsyncData(previous.copyWith(debtSettlementEnabled: enabled));
+    state = AsyncData(next);
 
     final result = await ref
         .read(settingsRepositoryProvider)
-        .saveSettings(debtSettlementEnabled: enabled);
+        .saveSettings(settings: next);
 
     result.when((_) {}, (_) => state = AsyncData(previous));
   }
+
+  UserSettings get _current => state.value ?? const UserSettings();
+
+  Future<void> setDebtSettlementEnabled({required bool enabled}) =>
+      _save(_current.copyWith(debtSettlementEnabled: enabled));
+
+  Future<void> setMonthProjectionEnabled({required bool enabled}) =>
+      _save(_current.copyWith(monthProjectionEnabled: enabled));
+
+  Future<void> markDebtSettlementExplainerSeen() =>
+      _save(_current.copyWith(debtSettlementExplainerSeen: true));
+
+  Future<void> markMonthProjectionExplainerSeen() =>
+      _save(_current.copyWith(monthProjectionExplainerSeen: true));
+
+  Future<void> markFirstStepsDismissed() =>
+      _save(_current.copyWith(firstStepsDismissed: true));
 }

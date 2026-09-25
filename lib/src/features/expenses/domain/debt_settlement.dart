@@ -36,6 +36,7 @@ List<DebtTransfer> settleDebts({
   required List<UserProfile> members,
   required int year,
   required int month,
+  Set<int> excludedCategoryIds = const {},
 }) {
   if (members.isEmpty) {
     return const [];
@@ -44,8 +45,14 @@ List<DebtTransfer> settleDebts({
   final monthExpenses = expenses.where(
     (e) => e.date.year == year && e.date.month == month,
   );
-  // ponytail: gastos sin pagador asignado quedan fuera del cálculo de saldos
-  final included = monthExpenses.where((e) => e.userUuid != null).toList();
+  // ponytail: gastos sin pagador asignado y categorías no-gasto (Ahorro)
+  // quedan fuera del cálculo de saldos
+  final included = monthExpenses
+      .where(
+        (e) =>
+            e.userUuid != null && !excludedCategoryIds.contains(e.categoryId),
+      )
+      .toList();
 
   final names = {for (final m in members) m.id: '${m.name} ${m.lastName}'};
   final paid = <String, double>{};

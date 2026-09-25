@@ -10,6 +10,7 @@ class CategoryBreakdown extends Equatable {
     this.categoryIcon,
     this.budgetAmount,
     this.previousAmount = 0,
+    this.isExpense = true,
   });
 
   final int categoryId;
@@ -23,6 +24,10 @@ class CategoryBreakdown extends Equatable {
   /// Total del mismo mes anterior. 0 si la categoría no tuvo gastos entonces.
   final double previousAmount;
 
+  /// false = categoría no-gasto (ingreso/transferencia): no consume % del
+  /// total de gastos ni genera insights.
+  final bool isExpense;
+
   @override
   List<Object?> get props => [
     categoryId,
@@ -33,5 +38,6 @@ class CategoryBreakdown extends Equatable {
     categoryIcon,
     budgetAmount,
     previousAmount,
+    isExpense,
   ];
 }

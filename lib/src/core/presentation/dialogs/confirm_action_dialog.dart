@@ -13,7 +13,7 @@ Future<bool> showConfirmActionDialog({
     context: context,
     builder: (context) => AlertDialog(
       title: Text(title),
-      content: Text(content),
+      content: Text(content, style: Theme.of(context).textTheme.bodyLarge),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),

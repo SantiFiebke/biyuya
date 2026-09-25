@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/presentation/dialogs/info_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
@@ -58,6 +59,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
   late final TextEditingController _budgetController;
   String? _selectedColor;
   IconData? _selectedIcon;
+  late bool _isExpense;
 
   bool get _saving => ref.watch(categoryControllerProvider).isLoading;
 
@@ -73,6 +75,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
           ? ''
           : FormValidators.formatAmountInput(cat!.budgetAmount!),
     );
+    _isExpense = cat?.isExpense ?? true;
     _selectedColor = cat?.color;
     _selectedIcon = cat?.icon != null
         ? _presetIcons.firstWhere(
@@ -107,6 +110,7 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
           icon: iconCode,
           budgetAmount: budgetAmount,
           categoryId: categoryId,
+          isExpense: _isExpense,
         );
 
     if (!mounted) {
@@ -173,6 +177,28 @@ class _CategoryFormViewState extends ConsumerState<CategoryFormView> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 24),
+              SwitchListTile(
+                secondary: const Icon(Icons.receipt_long_outlined),
+                title: Row(
+                  children: [
+                    const Expanded(child: Text('Cuenta como gasto')),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.info_outline),
+                      onPressed: () => showInfoDialog(
+                        context: context,
+                        title: '¿Qué significa "Cuenta como gasto"?',
+                        content:
+                            'Si lo desactivás, los gastos de esta categoría no se suman a los totales ni a los reportes (por ejemplo, Ahorro). Seguís viendo los movimientos en la lista de gastos.',
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: const Text('Se suma a los totales y reportes'),
+                value: _isExpense,
+                onChanged: (value) => setState(() => _isExpense = value),
               ),
               const SizedBox(height: 24),
               Text('Color', style: Theme.of(context).textTheme.titleMedium),

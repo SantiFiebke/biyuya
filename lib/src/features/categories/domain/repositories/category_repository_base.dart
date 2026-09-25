@@ -26,6 +26,7 @@ abstract class CategoryRepositoryBase {
     String? color,
     String? icon,
     double? budgetAmount,
+    bool isExpense = true,
   });
 
   /// Actualiza una categoría existente
@@ -35,6 +36,7 @@ abstract class CategoryRepositoryBase {
     String? color,
     String? icon,
     double? budgetAmount,
+    bool isExpense = true,
   });
 
   /// Elimina una categoría

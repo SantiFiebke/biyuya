@@ -22,6 +22,7 @@ CategoryBreakdown breakdown({
   required String name,
   required double amount,
   double previousAmount = 0,
+  bool isExpense = true,
 }) {
   return CategoryBreakdown(
     categoryId: categoryId,
@@ -29,6 +30,7 @@ CategoryBreakdown breakdown({
     amount: amount,
     percentage: 100,
     previousAmount: previousAmount,
+    isExpense: isExpense,
   );
 }
 
@@ -139,6 +141,44 @@ void main() {
       final report = buildReport([
         breakdown(categoryId: 1, name: 'A', amount: 100),
         breakdown(categoryId: 2, name: 'B', amount: 500),
+      ]);
+
+      expect(generateInsights(report: report), isEmpty);
+    });
+
+    test('breakdowns with isExpense false are ignored', () {
+      // Ahorro calificaría (+32%) pero no es gasto → fuera.
+      final report = buildReport([
+        breakdown(
+          categoryId: 1,
+          name: 'Ahorro',
+          amount: 16500,
+          previousAmount: 12500,
+          isExpense: false,
+        ),
+        breakdown(
+          categoryId: 2,
+          name: 'Food',
+          amount: 16500,
+          previousAmount: 12500,
+        ),
+      ]);
+
+      final insights = generateInsights(report: report);
+
+      expect(insights, hasLength(1));
+      expect(insights.single.categoryId, 2);
+    });
+
+    test('only non-expense breakdowns yields empty list', () {
+      final report = buildReport([
+        breakdown(
+          categoryId: 1,
+          name: 'Ahorro',
+          amount: 5000,
+          previousAmount: 1000,
+          isExpense: false,
+        ),
       ]);
 
       expect(generateInsights(report: report), isEmpty);

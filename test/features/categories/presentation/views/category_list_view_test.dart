@@ -85,9 +85,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('No hay categorías'), findsOneWidget);
+      expect(find.text('Sin categorías'), findsOneWidget);
       expect(
-        find.text('Creá categorías para organizar tus gastos'),
+        find.text('Creá una categoría para clasificar tus gastos'),
+        findsOneWidget,
+      );
+      expect(find.text('Crear categoría'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Crear categoría'),
         findsOneWidget,
       );
     }, timeout: const Timeout(Duration(seconds: 30)));

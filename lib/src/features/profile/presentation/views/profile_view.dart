@@ -195,15 +195,92 @@ class _MenuItems extends ConsumerWidget {
                     .watch(settingsControllerProvider)
                     .value
                     ?.debtSettlementEnabled ??
-                true,
-            onChanged: (v) => ref
-                .read(settingsControllerProvider.notifier)
-                .toggle(enabled: v),
+                false,
+            onChanged: (v) => _toggleFlag(
+              context,
+              value: v,
+              explainerSeen:
+                  ref
+                      .read(settingsControllerProvider)
+                      .value
+                      ?.debtSettlementExplainerSeen ??
+                  false,
+              explainerTitle: 'Liquidación de deudas',
+              explainerContent:
+                  'Si comparten gastos, acá vas a ver quién le debe a quién y cuánto. La app suma lo que pagó cada uno y calcula las transferencias para quedar a mano. ¿La activamos?',
+              setEnabled: ({required enabled}) => ref
+                  .read(settingsControllerProvider.notifier)
+                  .setDebtSettlementEnabled(enabled: enabled),
+              markSeen: () => ref
+                  .read(settingsControllerProvider.notifier)
+                  .markDebtSettlementExplainerSeen(),
+            ),
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.trending_up),
+            title: const Text('Proyección fin de mes'),
+            subtitle: const Text('Estimar cuánto vas a gastar este mes'),
+            value:
+                ref
+                    .watch(settingsControllerProvider)
+                    .value
+                    ?.monthProjectionEnabled ??
+                false,
+            onChanged: (v) => _toggleFlag(
+              context,
+              value: v,
+              explainerSeen:
+                  ref
+                      .read(settingsControllerProvider)
+                      .value
+                      ?.monthProjectionExplainerSeen ??
+                  false,
+              explainerTitle: 'Proyección fin de mes',
+              explainerContent:
+                  'Te muestra cuánto vas a gastar al terminar el mes, siguiendo el ritmo que llevás hasta ahora. Ojo: es un cálculo simple, no distingue gastos de una sola vez (tarjetas, servicios, cuotas), así que puede variar. ¿La activamos?',
+              setEnabled: ({required enabled}) => ref
+                  .read(settingsControllerProvider.notifier)
+                  .setMonthProjectionEnabled(enabled: enabled),
+              markSeen: () => ref
+                  .read(settingsControllerProvider.notifier)
+                  .markMonthProjectionExplainerSeen(),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Explainer-on-first-enable pattern shared by the settings switches:
+/// turning ON shows a confirm dialog once, later toggles apply directly.
+Future<void> _toggleFlag(
+  BuildContext context, {
+  required bool value,
+  required bool explainerSeen,
+  required String explainerTitle,
+  required String explainerContent,
+  required Future<void> Function({required bool enabled}) setEnabled,
+  required Future<void> Function() markSeen,
+}) async {
+  if (!value || explainerSeen) {
+    await setEnabled(enabled: value);
+    return;
+  }
+
+  final confirmed = await showConfirmActionDialog(
+    context: context,
+    title: explainerTitle,
+    content: explainerContent,
+    confirmLabel: 'Activar',
+  );
+  if (!confirmed || !context.mounted) {
+    return;
+  }
+
+  await setEnabled(enabled: true);
+  await markSeen();
 }
 
 class _HouseholdActionsCard extends ConsumerWidget {

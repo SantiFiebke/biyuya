@@ -56,6 +56,47 @@ class ExpenseRepositoryImpl implements ExpenseRepositoryBase {
   }
 
   @override
+  Future<Result<List<Expense>, ExpenseFailure>> getExpensesPage({
+    required int householdId,
+    required int limit,
+    required int offset,
+    int? categoryId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? userUuid,
+  }) async {
+    try {
+      var query = _client
+          .from('expenses')
+          .select('*, profiles(name)')
+          .eq('household_id', householdId);
+
+      if (categoryId != null) {
+        query = query.eq('category_id', categoryId);
+      }
+      if (startDate != null) {
+        query = query.gte('date', startDate.toIso8601String());
+      }
+      if (endDate != null) {
+        query = query.lte('date', endDate.toIso8601String());
+      }
+      if (userUuid != null) {
+        query = query.eq('user_uuid', userUuid);
+      }
+
+      final data = await query
+          .order('date', ascending: false)
+          .range(offset, offset + limit - 1)
+          .timeout(kNetworkTimeout);
+
+      final expenses = data.map(ExpenseModel.fromJson).toList();
+      return Success(expenses);
+    } on Exception catch (e) {
+      return Error(ExpenseFailure('Error al obtener página de gastos: $e'));
+    }
+  }
+
+  @override
   Future<Result<Expense, ExpenseFailure>> createExpense({
     required double amount,
     required DateTime date,

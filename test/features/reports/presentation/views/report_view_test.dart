@@ -1,14 +1,19 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
+import 'package:biyuya/src/features/reports/domain/entities/insight.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:biyuya/src/features/reports/presentation/views/report_view.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/insights_section.dart';
 import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
 import 'package:biyuya/theme/theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
@@ -16,6 +21,13 @@ import 'package:multiple_result/multiple_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart' show Override;
 
 import '../../../../helpers/test_helpers.dart';
+
+// Session without household → ReportController keeps AsyncData(null).
+class _NoHouseholdAuthSession extends AuthSessionController {
+  @override
+  FutureOr<UserProfile?> build() =>
+      const UserProfile(id: 'test-user-id', name: 'Test', lastName: 'User');
+}
 
 const _testReport = MonthlyReport(
   total: 1000,
@@ -52,6 +64,7 @@ void main() {
     double amount = 600,
     double? budgetAmount,
     double previousAmount = 0,
+    bool isExpense = true,
   }) {
     return CategoryBreakdown(
       categoryId: 1,
@@ -62,6 +75,7 @@ void main() {
       categoryIcon: '63046',
       budgetAmount: budgetAmount,
       previousAmount: previousAmount,
+      isExpense: isExpense,
     );
   }
 
@@ -210,6 +224,33 @@ void main() {
       expect(find.text('No se pudo cargar el reporte'), findsOneWidget);
     });
 
+    testWidgets('shows empty state with Registrar gasto CTA when no report', (
+      tester,
+    ) async {
+      // No household in session → controller stays AsyncData(null).
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ReportView(),
+          overrides: [
+            reportRepositoryProvider.overrideWithValue(mockRepo),
+            authSessionControllerProvider.overrideWith(
+              _NoHouseholdAuthSession.new,
+            ),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Sin datos este mes'), findsOneWidget);
+      expect(find.text('Registrar gasto'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Registrar gasto'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('shows progress bar when breakdown has budget', (tester) async {
       stubReport(
         makeReport(categoryBreakdowns: [breakdown(budgetAmount: 500)]),
@@ -323,6 +364,115 @@ void main() {
 
       expect(find.text('Insights del mes'), findsNothing);
       expect(find.byType(InsightCard), findsNothing);
+    });
+
+    testWidgets('non-expense breakdown renders chip last, no percentage', (
+      tester,
+    ) async {
+      // Ahorro (no gasto) con monto MAYOR que Food: igual va al final.
+      stubReport(
+        makeReport(
+          categoryBreakdowns: [
+            const CategoryBreakdown(
+              categoryId: 2,
+              categoryName: 'Ahorro',
+              amount: 900,
+              percentage: 90,
+              budgetAmount: 1000,
+              isExpense: false,
+            ),
+            breakdown(),
+          ],
+        ),
+      );
+
+      await pumpReport(tester);
+
+      // Chip solo en la categoría no-gasto.
+      expect(find.text('No es gasto'), findsOneWidget);
+      // Sin porcentaje: '90.0%' no aparece; el gasto sí conserva el suyo.
+      expect(find.text('90.0%'), findsNothing);
+      expect(find.text('60.0%'), findsOneWidget);
+      // Sin barra de presupuesto para no-gasto (la gasto no tiene budget).
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // Orden: gasto primero, no-gasto al final.
+      final names = tester
+          .widgetList<CategoryBreakdownTile>(find.byType(CategoryBreakdownTile))
+          .map((tile) => tile.breakdown.categoryName);
+      expect(names, ['Food', 'Ahorro']);
+    });
+
+    testWidgets('ReportContent forwards onInsightTap to InsightCard tap', (
+      tester,
+    ) async {
+      const insight = Insight(
+        categoryId: 1,
+        categoryName: 'Food',
+        currentAmount: 600,
+        previousAmount: 480,
+        changePct: 25,
+        isIncrease: true,
+      );
+      Insight? tapped;
+
+      await tester.pumpWidget(
+        wrapTest(
+          child: ReportContent(
+            report: _testReport,
+            insights: const [insight],
+            onCategoryTap: (_) {},
+            onInsightTap: (value) => tapped = value,
+          ),
+          overrides: defaultOverrides(),
+          theme: theme,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(InsightCard), findsOneWidget);
+      await tester.ensureVisible(find.byType(InsightCard));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(InsightCard));
+      await tester.pump();
+
+      expect(tapped, isNotNull);
+      expect(tapped, insight);
+    });
+
+    testWidgets('tapping an insight opens the comparison sheet', (
+      tester,
+    ) async {
+      stubReport(
+        makeReport(categoryBreakdowns: [breakdown(previousAmount: 480)]),
+      );
+
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ReportView(),
+          overrides: [
+            ...defaultOverrides(),
+            expenseControllerProvider.overrideWithValue(
+              const AsyncData(<Expense>[]),
+            ),
+          ],
+          theme: theme,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(InsightCard), findsOneWidget);
+      await tester.ensureVisible(find.byType(InsightCard));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(InsightCard));
+      await tester.pumpAndSettle();
+
+      // Sheet comparativa: sección 'Mes anterior' sin gastos (fixture vacía).
+      expect(find.text('Mes anterior'), findsOneWidget);
+      expect(find.text('Sin gastos el mes anterior'), findsOneWidget);
     });
   });
 }

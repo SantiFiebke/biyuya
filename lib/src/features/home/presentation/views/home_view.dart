@@ -10,15 +10,19 @@ import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
 import 'package:biyuya/src/core/presentation/widgets/pending_badge.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/domain/expense_totals.dart';
 import 'package:biyuya/src/features/expenses/domain/utils/duplicate_detection.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/edit_household_dialog.dart';
+import 'package:biyuya/src/features/home/presentation/widgets/first_steps_checklist.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/invite_code_sheet.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/month_projection_card.dart';
+import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:flutter/services.dart';
@@ -36,6 +40,42 @@ class HomeView extends ConsumerWidget {
     final expenses = ref.watch(expenseControllerProvider);
     final household = ref.watch(householdNameProvider);
     final categories = ref.watch(categoryControllerProvider);
+    final settings = ref.watch(settingsControllerProvider).value;
+    final monthProjectionEnabled = settings?.monthProjectionEnabled ?? false;
+
+    // First-steps checklist state (derived here, widget stays dumb).
+    final hasExpenses = expenses.value?.isNotEmpty ?? false;
+    final hasMembers =
+        (ref.watch(householdMembersProvider).value?.length ?? 0) > 1;
+    final featureEnabled =
+        (settings?.debtSettlementEnabled ?? false) || monthProjectionEnabled;
+    final dismissed = settings?.firstStepsDismissed ?? false;
+    final allDone = hasExpenses && hasMembers && featureEnabled;
+    final showChecklist = !dismissed && !allDone;
+
+    final firstStepsItems = [
+      FirstStepItem(
+        label: 'Registrá tu primer gasto',
+        done: hasExpenses,
+        onTap: () => context.push(AppRoute.expenseNew.path),
+      ),
+      FirstStepItem(
+        label: 'Invitá a alguien a tu hogar',
+        done: hasMembers,
+        onTap: () {
+          final inviteCode = household.value?.inviteCode;
+          if (inviteCode == null) {
+            return;
+          }
+          InviteCodeSheet.show(context, inviteCode: inviteCode);
+        },
+      ),
+      FirstStepItem(
+        label: 'Activá proyección o liquidación de deudas',
+        done: featureEnabled,
+        onTap: () => context.go(AppRoute.profile.path),
+      ),
+    ];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Cuentas claras')),
@@ -50,6 +90,16 @@ class HomeView extends ConsumerWidget {
             expenses: expenses,
             household: household,
             categories: categories.value ?? [],
+            showMonthProjection: monthProjectionEnabled,
+            showFirstSteps: showChecklist,
+            firstStepsItems: firstStepsItems,
+            onDismissFirstSteps: () {
+              unawaited(
+                ref
+                    .read(settingsControllerProvider.notifier)
+                    .markFirstStepsDismissed(),
+              );
+            },
             onEditHousehold: () => showEditHouseholdDialog(context, ref),
             onRetryExpenses: () =>
                 ref.invalidate(expenseControllerProvider, asReload: true),
@@ -68,6 +118,10 @@ class _HomeContent extends StatelessWidget {
     required this.expenses,
     required this.household,
     required this.categories,
+    required this.showMonthProjection,
+    required this.showFirstSteps,
+    required this.firstStepsItems,
+    required this.onDismissFirstSteps,
     required this.onEditHousehold,
     required this.onRetryExpenses,
   });
@@ -75,6 +129,10 @@ class _HomeContent extends StatelessWidget {
   final AsyncValue<List<Expense>> expenses;
   final AsyncValue<HouseholdData?> household;
   final List<Category> categories;
+  final bool showMonthProjection;
+  final bool showFirstSteps;
+  final List<FirstStepItem> firstStepsItems;
+  final VoidCallback onDismissFirstSteps;
   final VoidCallback onEditHousehold;
   final VoidCallback onRetryExpenses;
 
@@ -82,9 +140,12 @@ class _HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final expenseList = expenses.value ?? [];
-    final monthlyTotal = expenseList
-        .where((e) => e.date.year == now.year && e.date.month == now.month)
-        .fold<double>(0, (sum, e) => sum + e.amount);
+    final monthlyTotal = sumCountableBy(
+      expenseList.where(
+        (e) => e.date.year == now.year && e.date.month == now.month,
+      ),
+      categories,
+    );
     final categoryMap = {for (final c in categories) c.id: c};
 
     return CustomScrollView(
@@ -97,13 +158,22 @@ class _HomeContent extends StatelessWidget {
             onEditHousehold: onEditHousehold,
           ),
         ),
-        // 2. Month projection (signal from monthly total, no providers)
-        SliverToBoxAdapter(
-          child: MonthProjectionCard(
-            spentSoFar: monthlyTotal,
-            referenceDate: now,
+        // 1b. First-steps checklist (dismissible onboarding aid)
+        if (showFirstSteps)
+          SliverToBoxAdapter(
+            child: FirstStepsChecklist(
+              items: firstStepsItems,
+              onDismiss: onDismissFirstSteps,
+            ),
           ),
-        ),
+        // 2. Month projection (signal from monthly total, no providers)
+        if (showMonthProjection)
+          SliverToBoxAdapter(
+            child: MonthProjectionCard(
+              spentSoFar: monthlyTotal,
+              referenceDate: now,
+            ),
+          ),
         // 3. Quick actions
         const SliverToBoxAdapter(child: _QuickActions()),
         // 4. Section header

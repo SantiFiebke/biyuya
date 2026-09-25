@@ -1,6 +1,7 @@
 import 'package:biyuya/src/core/network/network_timeout.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/domain/repositories/category_repository_base.dart';
+import 'package:biyuya/src/features/expenses/domain/expense_totals.dart';
 import 'package:biyuya/src/features/expenses/domain/models/expense_model.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
@@ -35,21 +36,21 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
         month: previousMonth,
       );
 
-      final total = currentExpenses.fold<double>(0, (sum, e) => sum + e.amount);
-      final previousTotal = previousExpenses.fold<double>(
-        0,
-        (sum, e) => sum + e.amount,
-      );
+      final categories = await _loadCategories(householdId);
+      final excludedIds = excludedCategoryIds(categories);
+
+      final total = sumCountableExpenses(currentExpenses, excludedIds);
+      final previousTotal = sumCountableExpenses(previousExpenses, excludedIds);
 
       final variation = previousTotal > 0
           ? ((total - previousTotal) / previousTotal) * 100
           : 0.0;
 
-      final categoryBreakdowns = await _calculateCategoryBreakdowns(
+      final categoryBreakdowns = _calculateCategoryBreakdowns(
         expenses: currentExpenses,
         previousExpenses: previousExpenses,
         total: total,
-        householdId: householdId,
+        categories: categories,
       );
 
       return Success(
@@ -86,12 +87,21 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
     return data.map(ExpenseModel.fromJson).toList();
   }
 
-  Future<List<CategoryBreakdown>> _calculateCategoryBreakdowns({
+  Future<List<Category>> _loadCategories(int householdId) async {
+    final result = await _categoryRepository.getCategories(
+      householdId: householdId,
+    );
+    // ponytail: local avoids R inferring as Future from the return context.
+    final categories = result.when((cats) => cats, (_) => <Category>[]);
+    return categories;
+  }
+
+  List<CategoryBreakdown> _calculateCategoryBreakdowns({
     required List<ExpenseModel> expenses,
     required List<ExpenseModel> previousExpenses,
     required double total,
-    required int householdId,
-  }) async {
+    required List<Category> categories,
+  }) {
     final categoryTotals = <int, double>{};
     for (final expense in expenses) {
       final categoryId = expense.categoryId;
@@ -116,21 +126,14 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
       return [];
     }
 
-    final categoriesResult = await _categoryRepository.getCategories(
-      householdId: householdId,
-    );
-
-    final categories = categoriesResult.when(
-      (cats) => cats,
-      (_) => <Category>[],
-    );
-
     final breakdowns = <CategoryBreakdown>[];
     for (final categoryId in categoryIds) {
       final category = categories.where((c) => c.id == categoryId).firstOrNull;
       final amount = categoryTotals[categoryId] ?? 0;
       final previousAmount = previousCategoryTotals[categoryId] ?? 0;
-      final percentage = total > 0 ? (amount / total) * 100 : 0.0;
+      final isExpense = category?.isExpense ?? true;
+      // Categorías no-gasto no consumen % del total de gastos.
+      final percentage = isExpense && total > 0 ? (amount / total) * 100 : 0.0;
 
       breakdowns.add(
         CategoryBreakdown(
@@ -142,6 +145,7 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
           amount: amount,
           percentage: percentage,
           previousAmount: previousAmount,
+          isExpense: isExpense,
         ),
       );
     }

@@ -10,16 +10,19 @@ class DefaultCategory {
     required this.name,
     required this.color,
     required this.icon,
+    this.isExpense = true,
   });
 
   final String name;
   final String color;
   final int icon;
+  final bool isExpense;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'name': name,
     'color': color,
     'icon': icon.toString(),
+    'is_expense': isExpense,
   };
 }
 

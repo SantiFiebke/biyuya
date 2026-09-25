@@ -40,9 +40,11 @@ class CategoryListView extends ConsumerWidget {
         ),
         data: (categories) {
           if (categories.isEmpty) {
-            return const EmptyView(
-              title: 'No hay categorías',
-              message: 'Creá categorías para organizar tus gastos',
+            return EmptyView(
+              title: 'Sin categorías',
+              message: 'Creá una categoría para clasificar tus gastos',
+              actionLabel: 'Crear categoría',
+              onAction: () => context.push(AppRoute.categoryNew.path),
             );
           }
           return ListView.builder(

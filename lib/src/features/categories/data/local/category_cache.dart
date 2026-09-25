@@ -45,6 +45,7 @@ class CategoryCache {
       'icon': category.icon,
       'household_id': category.householdId,
       'budget_amount': category.budgetAmount,
+      'is_expense': category.isExpense,
       'created_at': category.createdAt.toIso8601String(),
     };
   }

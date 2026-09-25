@@ -9,6 +9,7 @@ class Category extends Equatable {
     this.color,
     this.icon,
     this.budgetAmount,
+    this.isExpense = true,
   });
 
   final int id;
@@ -19,6 +20,9 @@ class Category extends Equatable {
   final DateTime createdAt;
   final double? budgetAmount;
 
+  /// false = income/transfer style category; excluded from expense totals.
+  final bool isExpense;
+
   @override
   List<Object?> get props => [
     id,
@@ -28,5 +32,6 @@ class Category extends Equatable {
     householdId,
     createdAt,
     budgetAmount,
+    isExpense,
   ];
 }

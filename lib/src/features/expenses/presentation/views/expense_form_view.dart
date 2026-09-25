@@ -86,6 +86,16 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
     }
   }
 
+  /// Cierra el form: `pop` si hay ruta empujada en el branch de Expenses
+  /// (evita que `go(home)` deje el form en el stack del shell branch).
+  void _close() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoute.home.path);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -117,9 +127,10 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
     }
 
     if (success) {
-      context
-        ..showSuccessSnackBar(isEditing ? 'Gasto actualizado' : 'Gasto creado')
-        ..go(AppRoute.home.path);
+      context.showSuccessSnackBar(
+        isEditing ? 'Gasto actualizado' : 'Gasto creado',
+      );
+      _close();
     } else {
       context.showErrorSnackBar('Error al guardar el gasto');
     }
@@ -152,7 +163,7 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
         title: Text(isEditing ? 'Editar gasto' : 'Nuevo gasto'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(AppRoute.home.path),
+          onPressed: _close,
         ),
       ),
       body: SingleChildScrollView(
@@ -252,9 +263,7 @@ class _ExpenseFormViewState extends ConsumerState<ExpenseFormView> {
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: _saving
-                    ? null
-                    : () => context.go(AppRoute.home.path),
+                onPressed: _saving ? null : _close,
                 child: const Text('Cancelar'),
               ),
             ],

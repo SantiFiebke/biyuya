@@ -557,4 +557,60 @@ void main() {
       expect(find.text('Food'), findsNothing);
     });
   });
+
+  group('ExpenseFormView - navigation', () {
+    // Router harness: /form is pushed on top of /start, so a successful
+    // submit must `context.pop()` back to /start. If the view regressed to
+    // `context.go(home)` this router has no /home route and the test fails.
+    testWidgets('successful submit pops back to the previous route', (
+      tester,
+    ) async {
+      final router = GoRouter(
+        initialLocation: '/start',
+        routes: [
+          GoRoute(
+            path: '/start',
+            builder: (_, _) => const Scaffold(body: Text('Start')),
+          ),
+          GoRoute(path: '/form', builder: (_, _) => const ExpenseFormView()),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWith(
+              _SuccessExpenseController.new,
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Completes when the route pops — must not be awaited here.
+      unawaited(router.push('/form'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nuevo gasto'), findsOneWidget);
+
+      // Valid form: amount + category.
+      await tester.enterText(find.byType(TextFormField).first, '100');
+      await tester.tap(find.byType(DropdownButtonFormField<int>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Food'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Guardar gasto'));
+      await tester.tap(find.text('Guardar gasto'));
+      await tester.pumpAndSettle();
+
+      // Popped back to the previous route; the form is gone.
+      expect(find.text('Start'), findsOneWidget);
+      expect(find.text('Nuevo gasto'), findsNothing);
+    });
+  });
 }

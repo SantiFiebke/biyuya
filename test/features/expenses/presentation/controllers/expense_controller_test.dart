@@ -175,7 +175,11 @@ void main() {
 
     // Default: auto-load returns empty.
     when(
-      () => mockRepo.getExpenses(householdId: 1),
+      () => mockRepo.getExpensesByMonth(
+        householdId: 1,
+        year: any(named: 'year'),
+        month: any(named: 'month'),
+      ),
     ).thenAnswer((_) async => const Success([]));
 
     // Default: sync flush succeeds with a server expense.
@@ -209,7 +213,11 @@ void main() {
         makeExpense(id: 2, description: 'Transport'),
       ];
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => Success(expenses));
 
       container.read(expenseControllerProvider);
@@ -218,13 +226,26 @@ void main() {
       final state = container.read(expenseControllerProvider);
       expect(state.value, hasLength(2));
       expect(state.value![0].description, 'Food');
+      // Default load is current-month only (getExpensesByMonth), not full
+      // history.
+      verify(
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
+      ).called(1);
     });
 
     test('build sets AsyncError on load failure', () async {
       // No connectivity event: avoid the reconnect retrySync overwriting state.
       recreateContainer(online: Stream<bool>.value(false));
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => const Error(ExpenseFailure('db error')));
 
       container.read(expenseControllerProvider);
@@ -299,7 +320,11 @@ void main() {
     test('updateExpense updates existing expense in state', () async {
       final initial = makeExpense(id: 5);
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => Success([initial]));
 
       container.read(expenseControllerProvider);
@@ -354,7 +379,13 @@ void main() {
     });
 
     test('deleteExpense removes expense from state', () async {
-      when(() => mockRepo.getExpenses(householdId: 1)).thenAnswer(
+      when(
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
+      ).thenAnswer(
         (_) async => Success([
           makeExpense(description: 'A'),
           makeExpense(id: 2, description: 'B'),
@@ -435,7 +466,11 @@ void main() {
         recreateContainer(online: Stream<bool>.value(false));
         await store.add(pendingExpense(clientId: 'c1'));
         when(
-          () => mockRepo.getExpenses(householdId: 1),
+          () => mockRepo.getExpensesByMonth(
+            householdId: 1,
+            year: any(named: 'year'),
+            month: any(named: 'month'),
+          ),
         ).thenAnswer((_) async => const Error(ExpenseFailure('down')));
 
         container.read(expenseControllerProvider);
@@ -454,7 +489,11 @@ void main() {
       // the outbox is empty instead of wiping state to AsyncData([]).
       recreateContainer(online: Stream<bool>.value(false));
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => const Error(ExpenseFailure('down')));
 
       container.read(expenseControllerProvider);
@@ -480,7 +519,11 @@ void main() {
         await store.add(pendingExpense(clientId: 'c1'));
 
         when(
-          () => mockRepo.getExpenses(householdId: 1),
+          () => mockRepo.getExpensesByMonth(
+            householdId: 1,
+            year: any(named: 'year'),
+            month: any(named: 'month'),
+          ),
         ).thenAnswer((_) async => const Error(ExpenseFailure('down')));
         final server = makeExpense(id: 42);
         stubCreateExpense(() async => Success(server));
@@ -499,7 +542,11 @@ void main() {
 
         // Network back: server now returns the synced expense.
         when(
-          () => mockRepo.getExpenses(householdId: 1),
+          () => mockRepo.getExpensesByMonth(
+            householdId: 1,
+            year: any(named: 'year'),
+            month: any(named: 'month'),
+          ),
         ).thenAnswer((_) async => Success([server]));
         online.add(true);
         await settle();
@@ -521,7 +568,11 @@ void main() {
       recreateContainer(online: Stream<bool>.value(false));
       await store.add(pendingExpense(clientId: 'c1'));
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => const Success([]));
 
       container.read(expenseControllerProvider);
@@ -542,7 +593,11 @@ void main() {
         recreateContainer(online: Stream<bool>.value(false));
         await store.add(pendingExpense(id: -7, clientId: 'c1'));
         when(
-          () => mockRepo.getExpenses(householdId: 1),
+          () => mockRepo.getExpensesByMonth(
+            householdId: 1,
+            year: any(named: 'year'),
+            month: any(named: 'month'),
+          ),
         ).thenAnswer((_) async => const Success([]));
 
         container.read(expenseControllerProvider);
@@ -573,7 +628,11 @@ void main() {
       recreateContainer(online: Stream<bool>.value(false));
       await store.add(pendingExpense(id: -5, clientId: 'c1'));
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => const Success([]));
 
       container.read(expenseControllerProvider);
@@ -643,7 +702,11 @@ void main() {
       final today2 = todayExpense(id: 2, amount: 250);
       final past = pastExpense(id: 3, amount: 500);
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => Success([today1, today2, past]));
 
       container.read(expenseControllerProvider);
@@ -661,7 +724,11 @@ void main() {
     test('past expenses only → total is 0.0', () async {
       final past = pastExpense(id: 1, amount: 999);
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => Success([past]));
 
       container.read(expenseControllerProvider);
@@ -677,7 +744,11 @@ void main() {
       () async {
         final existing = todayExpense(id: 1, amount: 100);
         when(
-          () => mockRepo.getExpenses(householdId: 1),
+          () => mockRepo.getExpensesByMonth(
+            householdId: 1,
+            year: any(named: 'year'),
+            month: any(named: 'month'),
+          ),
         ).thenAnswer((_) async => Success([existing]));
 
         container.read(expenseControllerProvider);
@@ -708,7 +779,11 @@ void main() {
       final exp1 = todayExpense(id: 1, amount: 200);
       final exp2 = todayExpense(id: 2, amount: 300);
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => Success([exp1, exp2]));
 
       container.read(expenseControllerProvider);
@@ -733,7 +808,11 @@ void main() {
     test('updateExpense recalculates total', () async {
       final exp1 = todayExpense(id: 1, amount: 100);
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => Success([exp1]));
 
       container.read(expenseControllerProvider);
@@ -768,7 +847,11 @@ void main() {
 
     test('refresh MethodChannel is called after loading expenses', () async {
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => Success([todayExpense(id: 1, amount: 50)]));
 
       container.read(expenseControllerProvider);
@@ -781,7 +864,11 @@ void main() {
 
     test('refresh MethodChannel is called after createExpense', () async {
       when(
-        () => mockRepo.getExpenses(householdId: 1),
+        () => mockRepo.getExpensesByMonth(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
       ).thenAnswer((_) async => const Success([]));
 
       container.read(expenseControllerProvider);
@@ -816,7 +903,13 @@ void main() {
         recreateContainer(categoryController: fakeCategories);
 
         final now = DateTime.now();
-        when(() => mockRepo.getExpenses(householdId: 1)).thenAnswer(
+        when(
+          () => mockRepo.getExpensesByMonth(
+            householdId: 1,
+            year: any(named: 'year'),
+            month: any(named: 'month'),
+          ),
+        ).thenAnswer(
           (_) async => Success([
             Expense(
               id: 1,

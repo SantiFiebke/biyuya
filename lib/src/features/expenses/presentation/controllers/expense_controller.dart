@@ -8,6 +8,7 @@ import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_c
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/domain/expense_totals.dart';
 import 'package:biyuya/src/features/expenses/domain/services/featured_categories_calculator.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
@@ -43,26 +44,12 @@ class ExpenseController extends _$ExpenseController {
     return const AsyncData([]);
   }
 
-  Future<void> _loadExpenses() async {
-    final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
-
-    if (householdId == null || householdId.isEmpty) {
-      _emitExpenses(const []);
-      return;
-    }
-
-    final pending = await ref.read(pendingExpenseStoreProvider).load();
-
-    state = const AsyncLoading();
-    final repository = ref.read(expenseRepositoryProvider);
-    final result = await repository.getExpenses(
-      householdId: int.parse(householdId),
-    );
-    result.when(
-      (synced) => _merge(synced, pending),
-      (failure) => _emitLoadFailure(failure, pending),
-    );
+  /// Default load: current month only — monthly total, recent entries and
+  /// today's total for home, plus the current month for debt settlement.
+  /// Full history is deliberately not fetched here.
+  Future<void> _loadExpenses() {
+    final now = DateTime.now();
+    return loadExpensesByMonth(year: now.year, month: now.month);
   }
 
   Future<void> loadExpensesByMonth({
@@ -100,14 +87,17 @@ class ExpenseController extends _$ExpenseController {
   void _emitExpenses(List<Expense> expenses) {
     state = AsyncData(expenses);
     final now = DateTime.now();
-    final todayTotal = expenses
-        .where(
-          (e) =>
-              e.date.year == now.year &&
-              e.date.month == now.month &&
-              e.date.day == now.day,
-        )
-        .fold<double>(0, (sum, e) => sum + e.amount);
+    final categories =
+        ref.read(categoryControllerProvider).value ?? const <Category>[];
+    final todayTotal = sumCountableExpenses(
+      expenses.where(
+        (e) =>
+            e.date.year == now.year &&
+            e.date.month == now.month &&
+            e.date.day == now.day,
+      ),
+      excludedCategoryIds(categories),
+    );
     unawaited(WidgetDailyTotalSync.syncTotal(todayTotal));
 
     _syncFeaturedCategories(expenses);
@@ -154,7 +144,8 @@ class ExpenseController extends _$ExpenseController {
     _emitExpenses(merged);
   }
 
-  /// Reloads the outbox, refreshes the network list and re-merges.
+  /// Reloads the outbox, refreshes the current-month network list and
+  /// re-merges. Keeps the previous state visible instead of flashing loading.
   Future<void> _reloadMerge() async {
     final pending = await ref.read(pendingExpenseStoreProvider).load();
     final session = ref.read(authSessionControllerProvider);
@@ -165,9 +156,14 @@ class ExpenseController extends _$ExpenseController {
       return;
     }
 
+    final now = DateTime.now();
     final result = await ref
         .read(expenseRepositoryProvider)
-        .getExpenses(householdId: int.parse(householdId));
+        .getExpensesByMonth(
+          householdId: int.parse(householdId),
+          year: now.year,
+          month: now.month,
+        );
     result.when(
       (synced) => _merge(synced, pending),
       (failure) => _emitLoadFailure(failure, pending),

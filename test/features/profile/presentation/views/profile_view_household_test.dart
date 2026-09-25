@@ -74,6 +74,8 @@ void main() {
       expect(find.text('Eliminar hogar'), findsOneWidget);
       expect(find.text('Salir del hogar'), findsNothing);
 
+      // Extra switch tile pushed the actions card below the fold.
+      await tester.ensureVisible(find.text('Eliminar hogar'));
       await tester.tap(find.text('Eliminar hogar'));
       await tester.pumpAndSettle();
 
@@ -108,6 +110,7 @@ void main() {
       expect(find.text('Salir del hogar'), findsOneWidget);
       expect(find.text('Eliminar hogar'), findsNothing);
 
+      await tester.ensureVisible(find.text('Salir del hogar'));
       await tester.tap(find.text('Salir del hogar'));
       await tester.pumpAndSettle();
 

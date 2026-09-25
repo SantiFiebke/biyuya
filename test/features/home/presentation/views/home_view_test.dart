@@ -1,14 +1,20 @@
+import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/utils/date_utils.dart';
 import 'package:biyuya/src/core/presentation/widgets/duplicate_warning_badge.dart';
 import 'package:biyuya/src/core/presentation/widgets/pending_badge.dart';
 import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/home/presentation/views/home_view.dart';
+import 'package:biyuya/src/features/home/presentation/widgets/first_steps_checklist.dart';
+import 'package:biyuya/src/features/home/presentation/widgets/month_projection_card.dart';
+import 'package:biyuya/src/features/settings/domain/entities/user_settings.dart';
+import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -23,6 +29,23 @@ class FakeHouseholdName extends HouseholdName {
   Future<HouseholdData?> build() async => data;
 }
 
+const _singleMember = UserProfile(
+  id: 'test-user-id',
+  name: 'Test',
+  lastName: 'User',
+  householdId: '1',
+);
+
+const List<UserProfile> _twoMembers = [
+  _singleMember,
+  UserProfile(
+    id: 'other-user-id',
+    name: 'Other',
+    lastName: 'User',
+    householdId: '1',
+  ),
+];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -31,6 +54,8 @@ List<Override> _baseOverrides({
   HouseholdData? householdData = const HouseholdData(name: 'Mi Hogar'),
   List<Expense> expenses = const [],
   List<Category> categories = const [],
+  UserSettings settings = const UserSettings(),
+  List<UserProfile> members = const [_singleMember],
 }) {
   final fakeNotifier = FakeHouseholdName()..data = householdData;
   return [
@@ -42,6 +67,12 @@ List<Override> _baseOverrides({
       AsyncData<List<Category>>(categories),
     ),
     householdNameProvider.overrideWith(() => fakeNotifier),
+    // keepAlive + hits authRepository (Supabase) otherwise.
+    householdMembersProvider.overrideWithValue(
+      AsyncData<List<UserProfile>>(members),
+    ),
+    // Bypasses SettingsController.build() _load (hits Supabase otherwise).
+    settingsControllerProvider.overrideWithValue(AsyncData(settings)),
   ];
 }
 
@@ -79,10 +110,22 @@ void main() {
       expect(find.textContaining('100,00', findRichText: true), findsWidgets);
     });
 
-    testWidgets('renders month projection card', (tester) async {
-      await _pumpHome(tester);
+    testWidgets('renders month projection card when enabled', (tester) async {
+      await _pumpHome(
+        tester,
+        overrides: _baseOverrides(
+          settings: const UserSettings(monthProjectionEnabled: true),
+        ),
+      );
 
       expect(find.text('Proyección fin de mes'), findsOneWidget);
+    });
+
+    testWidgets('hides month projection card when disabled', (tester) async {
+      await _pumpHome(tester);
+
+      expect(find.text('Proyección fin de mes'), findsNothing);
+      expect(find.byType(MonthProjectionCard), findsNothing);
     });
 
     testWidgets('renders quick actions', (tester) async {
@@ -200,6 +243,8 @@ void main() {
             overrides: _baseOverrides(
               expenses: [worstCase, duplicate],
               categories: [category],
+              // Checklist hidden: these assert expense-tile layout only.
+              settings: const UserSettings(firstStepsDismissed: true),
             ),
           );
 
@@ -243,6 +288,8 @@ void main() {
             overrides: _baseOverrides(
               expenses: [longExpense, duplicate],
               categories: [category],
+              // Checklist hidden: these assert expense-tile layout only.
+              settings: const UserSettings(firstStepsDismissed: true),
             ),
           );
 
@@ -263,5 +310,44 @@ void main() {
         },
       );
     }
+  });
+
+  group('HomeView first-steps checklist', () {
+    testWidgets('visible when not dismissed and not all steps done', (
+      tester,
+    ) async {
+      await _pumpHome(tester);
+
+      expect(find.byType(FirstStepsChecklist), findsOneWidget);
+      expect(find.text('Primeros pasos'), findsOneWidget);
+      expect(find.text('Registrá tu primer gasto'), findsOneWidget);
+      expect(find.text('Invitá a alguien a tu hogar'), findsOneWidget);
+    });
+
+    testWidgets('hidden when firstStepsDismissed is true', (tester) async {
+      await _pumpHome(
+        tester,
+        overrides: _baseOverrides(
+          settings: const UserSettings(firstStepsDismissed: true),
+        ),
+      );
+
+      expect(find.byType(FirstStepsChecklist), findsNothing);
+      expect(find.text('Primeros pasos'), findsNothing);
+    });
+
+    testWidgets('hidden when all steps are done', (tester) async {
+      await _pumpHome(
+        tester,
+        overrides: _baseOverrides(
+          expenses: [makeExpense(date: DateTime.now())],
+          members: _twoMembers,
+          settings: const UserSettings(monthProjectionEnabled: true),
+        ),
+      );
+
+      expect(find.byType(FirstStepsChecklist), findsNothing);
+      expect(find.text('Primeros pasos'), findsNothing);
+    });
   });
 }

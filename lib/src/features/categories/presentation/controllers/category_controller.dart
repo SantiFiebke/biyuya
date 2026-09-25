@@ -41,6 +41,7 @@ class CategoryController extends _$CategoryController {
     String? color,
     String? icon,
     double? budgetAmount,
+    bool isExpense = true,
   }) async {
     final session = ref.read(authSessionControllerProvider);
     final householdId = session.value?.householdId;
@@ -59,6 +60,7 @@ class CategoryController extends _$CategoryController {
       icon: icon,
       budgetAmount: budgetAmount,
       householdId: int.parse(householdId),
+      isExpense: isExpense,
     );
 
     return result.when(
@@ -79,6 +81,7 @@ class CategoryController extends _$CategoryController {
     String? color,
     String? icon,
     double? budgetAmount,
+    bool isExpense = true,
   }) async {
     final previous = state.value ?? [];
 
@@ -90,6 +93,7 @@ class CategoryController extends _$CategoryController {
       color: color,
       icon: icon,
       budgetAmount: budgetAmount,
+      isExpense: isExpense,
     );
 
     return result.when(
@@ -116,6 +120,7 @@ class CategoryController extends _$CategoryController {
     String? icon,
     double? budgetAmount,
     int? categoryId, // null = create, non-null = update
+    bool isExpense = true,
   }) {
     if (categoryId != null) {
       return updateCategory(
@@ -124,6 +129,7 @@ class CategoryController extends _$CategoryController {
         color: color,
         icon: icon,
         budgetAmount: budgetAmount,
+        isExpense: isExpense,
       );
     }
     return createCategory(
@@ -131,6 +137,7 @@ class CategoryController extends _$CategoryController {
       color: color,
       icon: icon,
       budgetAmount: budgetAmount,
+      isExpense: isExpense,
     );
   }
 

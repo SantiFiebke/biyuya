@@ -1,7 +1,7 @@
 import 'package:biyuya/src/features/reports/domain/entities/insight.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/insights_section.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../helpers/test_helpers.dart';
 
@@ -78,6 +78,46 @@ void main() {
 
       expect(find.byType(InsightCard), findsOneWidget);
       expect(find.textContaining('vs mes anterior'), findsOneWidget);
+    });
+
+    testWidgets('tapping InsightCard invokes onInsightTap with that insight', (
+      tester,
+    ) async {
+      final tapped = <Insight>[];
+      final insight = makeInsight();
+      final other = makeInsight(categoryId: 2, categoryName: 'Transporte');
+
+      await tester.pumpWidget(
+        wrapTest(
+          child: InsightsSection(
+            insights: [insight, other],
+            onInsightTap: tapped.add,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Comida: +25% vs mes anterior'));
+      await tester.pumpAndSettle();
+
+      expect(tapped, [insight]);
+    });
+
+    testWidgets('no tap handler attached when onInsightTap is null', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(child: InsightsSection(insights: [makeInsight()])),
+      );
+      await tester.pumpAndSettle();
+
+      final inkWell = tester.widget<InkWell>(
+        find.descendant(
+          of: find.byType(InsightCard),
+          matching: find.byType(InkWell),
+        ),
+      );
+      expect(inkWell.onTap, isNull);
     });
   });
 }

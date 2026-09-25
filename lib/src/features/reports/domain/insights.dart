@@ -16,6 +16,9 @@ List<Insight> generateInsights({
   final insights = <Insight>[];
 
   for (final breakdown in report.categoryBreakdowns) {
+    if (!breakdown.isExpense) {
+      continue;
+    }
     final previousAmount = breakdown.previousAmount;
     if (previousAmount <= 0) {
       continue;

@@ -23,6 +23,7 @@ class FakeCategoryController extends CategoryController {
   int submitCount = 0;
   String? lastName;
   double? lastBudgetAmount;
+  bool? lastIsExpense;
 
   @override
   AsyncValue<List<Category>> build() => const AsyncData([]);
@@ -34,10 +35,12 @@ class FakeCategoryController extends CategoryController {
     String? icon,
     double? budgetAmount,
     int? categoryId,
+    bool isExpense = true,
   }) async {
     submitCount++;
     lastName = name;
     lastBudgetAmount = budgetAmount;
+    lastIsExpense = isExpense;
     return false;
   }
 }
@@ -282,6 +285,104 @@ void main() {
 
       expect(find.text('El monto debe ser mayor a 0'), findsOneWidget);
       expect(fake.submitCount, 0);
+    });
+
+    testWidgets('switch "Cuenta como gasto" defaults ON for new category', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
+      await tester.pumpAndSettle();
+
+      final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+      expect(find.text('Cuenta como gasto'), findsOneWidget);
+      expect(tile.value, isTrue);
+    });
+
+    testWidgets(
+      'switch starts OFF when editing category with isExpense false',
+      (tester) async {
+        final category = Category(
+          id: 42,
+          name: 'Ahorro',
+          householdId: 1,
+          createdAt: DateTime(2025),
+          color: '#4CAF50',
+          icon: '63046',
+          isExpense: false,
+        );
+
+        await tester.pumpWidget(
+          wrapTest(child: CategoryFormView(category: category)),
+        );
+        await tester.pumpAndSettle();
+
+        final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+        expect(tile.value, isFalse);
+      },
+    );
+
+    testWidgets('toggling switch off and submitting passes isExpense=false', (
+      tester,
+    ) async {
+      final fake = FakeCategoryController();
+      await tester.pumpWidget(
+        wrapTest(child: const CategoryFormView(), overrides: _withFake(fake)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Ahorro');
+      await tester.ensureVisible(find.byType(Switch));
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+        isFalse,
+      );
+
+      await tester.ensureVisible(find.text('Crear'));
+      await tester.tap(find.text('Crear'));
+      await tester.pumpAndSettle();
+
+      expect(fake.submitCount, 1);
+      expect(fake.lastIsExpense, isFalse);
+    });
+
+    testWidgets('submitting without toggling passes isExpense=true', (
+      tester,
+    ) async {
+      final fake = FakeCategoryController();
+      await tester.pumpWidget(
+        wrapTest(child: const CategoryFormView(), overrides: _withFake(fake)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Food');
+      await tester.ensureVisible(find.text('Crear'));
+      await tester.tap(find.text('Crear'));
+      await tester.pumpAndSettle();
+
+      expect(fake.submitCount, 1);
+      expect(fake.lastIsExpense, isTrue);
+    });
+
+    testWidgets('info icon opens info dialog with explanation', (tester) async {
+      await tester.pumpWidget(wrapTest(child: const CategoryFormView()));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byIcon(Icons.info_outline));
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Qué significa "Cuenta como gasto"?'), findsOneWidget);
+      expect(
+        find.text(
+          'Si lo desactivás, los gastos de esta categoría no se suman a los '
+          'totales ni a los reportes (por ejemplo, Ahorro). Seguís viendo los '
+          'movimientos en la lista de gastos.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(FilledButton, 'Entendido'), findsOneWidget);
     });
   });
 }

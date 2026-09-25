@@ -36,7 +36,7 @@ class SettingsRepositoryImpl implements SettingsRepositoryBase {
 
   @override
   Future<Result<void, SettingsFailure>> saveSettings({
-    required bool debtSettlementEnabled,
+    required UserSettings settings,
   }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) {
@@ -50,7 +50,13 @@ class SettingsRepositoryImpl implements SettingsRepositoryBase {
           .from('user_settings')
           .upsert({
             'user_id': uid,
-            'debt_settlement_enabled': debtSettlementEnabled,
+            'debt_settlement_enabled': settings.debtSettlementEnabled,
+            'month_projection_enabled': settings.monthProjectionEnabled,
+            'debt_settlement_explainer_seen':
+                settings.debtSettlementExplainerSeen,
+            'month_projection_explainer_seen':
+                settings.monthProjectionExplainerSeen,
+            'first_steps_dismissed': settings.firstStepsDismissed,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           }, onConflict: 'user_id')
           .timeout(kNetworkTimeout);
