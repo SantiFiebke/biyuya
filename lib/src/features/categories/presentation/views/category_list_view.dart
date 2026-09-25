@@ -134,6 +134,7 @@ class CategoryTile extends StatelessWidget {
         title: Text(category.name),
         onTap: onEdit,
         trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           spacing: 10,
           children: [
             IconButton(
@@ -143,7 +144,7 @@ class CategoryTile extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.delete),
               color: Theme.of(context).colorScheme.error,
-              onPressed: onEdit,
+              onPressed: onDelete,
             ),
           ],
         ),

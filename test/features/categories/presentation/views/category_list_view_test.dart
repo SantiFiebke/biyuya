@@ -189,5 +189,44 @@ void main() {
       expect(find.text('Food'), findsNothing);
       expect(find.text('Transport'), findsOneWidget);
     }, timeout: const Timeout(Duration(seconds: 30)));
+
+    testWidgets(
+      'delete IconButton in trailing opens confirm dialog and records delete',
+      (tester) async {
+        final fake = _RecordingCategoryController(_testCategories);
+        await tester.pumpWidget(
+          wrapTest(
+            child: const CategoryListView(),
+            overrides: [categoryControllerProvider.overrideWith(() => fake)],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Scoped to first tile + IconButton so Dismissible's background
+        // Icons.delete never matches.
+        final deleteButton = find.descendant(
+          of: find.byType(CategoryTile).first,
+          matching: find.widgetWithIcon(IconButton, Icons.delete),
+        );
+        expect(deleteButton, findsOneWidget);
+
+        await tester.tap(deleteButton);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Eliminar categoría'), findsOneWidget);
+        expect(
+          find.text('¿Estás segura de que querés eliminar "Food"?'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.widgetWithText(TextButton, 'Eliminar'));
+        await tester.pumpAndSettle();
+
+        expect(fake.deletedIds, [1]);
+        expect(find.text('Food'), findsNothing);
+        expect(find.text('Transport'), findsOneWidget);
+      },
+      timeout: const Timeout(Duration(seconds: 30)),
+    );
   });
 }

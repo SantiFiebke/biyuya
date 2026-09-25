@@ -18,6 +18,7 @@ import 'package:biyuya/src/features/expenses/domain/utils/duplicate_detection.da
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/edit_household_dialog.dart';
 import 'package:biyuya/src/features/home/presentation/widgets/invite_code_sheet.dart';
+import 'package:biyuya/src/features/home/presentation/widgets/month_projection_card.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:flutter/services.dart';
@@ -96,11 +97,18 @@ class _HomeContent extends StatelessWidget {
             onEditHousehold: onEditHousehold,
           ),
         ),
-        // 2. Quick actions
+        // 2. Month projection (signal from monthly total, no providers)
+        SliverToBoxAdapter(
+          child: MonthProjectionCard(
+            spentSoFar: monthlyTotal,
+            referenceDate: now,
+          ),
+        ),
+        // 3. Quick actions
         const SliverToBoxAdapter(child: _QuickActions()),
-        // 3. Section header
+        // 4. Section header
         const SliverToBoxAdapter(child: _SectionHeader()),
-        // 4. Expense list / empty / skeleton
+        // 5. Expense list / empty / skeleton
         expenses.when(
           loading: () => const SliverToBoxAdapter(child: _HomeSkeleton()),
           error: (_, _) => SliverToBoxAdapter(

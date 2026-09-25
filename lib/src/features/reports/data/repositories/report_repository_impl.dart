@@ -47,6 +47,7 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
 
       final categoryBreakdowns = await _calculateCategoryBreakdowns(
         expenses: currentExpenses,
+        previousExpenses: previousExpenses,
         total: total,
         householdId: householdId,
       );
@@ -87,18 +88,32 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
 
   Future<List<CategoryBreakdown>> _calculateCategoryBreakdowns({
     required List<ExpenseModel> expenses,
+    required List<ExpenseModel> previousExpenses,
     required double total,
     required int householdId,
   }) async {
-    if (expenses.isEmpty) {
-      return [];
-    }
-
     final categoryTotals = <int, double>{};
     for (final expense in expenses) {
       final categoryId = expense.categoryId;
       categoryTotals[categoryId] =
           (categoryTotals[categoryId] ?? 0) + expense.amount;
+    }
+
+    final previousCategoryTotals = <int, double>{};
+    for (final expense in previousExpenses) {
+      final categoryId = expense.categoryId;
+      previousCategoryTotals[categoryId] =
+          (previousCategoryTotals[categoryId] ?? 0) + expense.amount;
+    }
+
+    // Unión: categorías presentes en el mes actual O en el anterior.
+    final categoryIds = <int>{
+      ...categoryTotals.keys,
+      ...previousCategoryTotals.keys,
+    };
+
+    if (categoryIds.isEmpty) {
+      return [];
     }
 
     final categoriesResult = await _categoryRepository.getCategories(
@@ -111,20 +126,22 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
     );
 
     final breakdowns = <CategoryBreakdown>[];
-    for (final entry in categoryTotals.entries) {
-      final category = categories.where((c) => c.id == entry.key).firstOrNull;
-      final amount = entry.value;
+    for (final categoryId in categoryIds) {
+      final category = categories.where((c) => c.id == categoryId).firstOrNull;
+      final amount = categoryTotals[categoryId] ?? 0;
+      final previousAmount = previousCategoryTotals[categoryId] ?? 0;
       final percentage = total > 0 ? (amount / total) * 100 : 0.0;
 
       breakdowns.add(
         CategoryBreakdown(
-          categoryId: entry.key,
+          categoryId: categoryId,
           categoryName: category?.name ?? 'Sin categoría',
           categoryColor: category?.color,
           categoryIcon: category?.icon,
           budgetAmount: category?.budgetAmount,
           amount: amount,
           percentage: percentage,
+          previousAmount: previousAmount,
         ),
       );
     }

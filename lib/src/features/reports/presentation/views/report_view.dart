@@ -7,9 +7,12 @@ import 'package:biyuya/src/core/presentation/widgets/category_avatar.dart';
 import 'package:biyuya/src/core/presentation/widgets/empty_view.dart';
 import 'package:biyuya/src/core/presentation/widgets/error_view.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
+import 'package:biyuya/src/features/reports/domain/entities/insight.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
+import 'package:biyuya/src/features/reports/domain/insights.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/category_expenses_sheet.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/insights_section.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -62,8 +65,11 @@ class ReportView extends ConsumerWidget {
               message: 'Registrá gastos para ver tu reporte',
             );
           }
+          // report no-null acá (guard arriba): insights del mes vs anterior.
+          final insights = generateInsights(report: report);
           return ReportContent(
             report: report,
+            insights: insights,
             onCategoryTap: (breakdown) {
               unawaited(
                 CategoryExpensesSheet.show(
@@ -84,15 +90,24 @@ class ReportView extends ConsumerWidget {
 class ReportContent extends StatelessWidget {
   const ReportContent({
     required this.report,
+    required this.insights,
     required this.onCategoryTap,
     super.key,
   });
 
   final MonthlyReport report;
+  final List<Insight> insights;
   final void Function(CategoryBreakdown breakdown) onCategoryTap;
 
   @override
   Widget build(BuildContext context) {
+    // Desglose puede incluir categorías solo del mes anterior (amount 0):
+    // tiles/empty-state solo muestran gastos del mes actual.
+    final visibleBreakdowns = report.categoryBreakdowns
+        .where((breakdown) => breakdown.amount > 0)
+        .toList();
+    // Mes sin gasto genera insights -100% (ruido) → no mostrar sección.
+    final showInsights = report.total > 0 && insights.isNotEmpty;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -113,18 +128,22 @@ class ReportContent extends StatelessWidget {
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          if (report.categoryBreakdowns.isEmpty)
+          if (visibleBreakdowns.isEmpty)
             const EmptyView(
               title: 'No hay gastos este mes',
               message: 'Registrá gastos para ver el desglose por categoría',
             )
           else
-            ...report.categoryBreakdowns.map(
+            ...visibleBreakdowns.map(
               (breakdown) => CategoryBreakdownTile(
                 breakdown: breakdown,
                 onTap: () => onCategoryTap(breakdown),
               ),
             ),
+          if (showInsights) ...[
+            const SizedBox(height: 24),
+            InsightsSection(insights: insights),
+          ],
         ],
       ),
     );

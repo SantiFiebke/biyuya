@@ -140,7 +140,7 @@ class CategoryController extends _$CategoryController {
     final repository = ref.read(categoryRepositoryProvider);
 
     final result = await repository.deleteCategory(id: id);
-    
+
     return result.when(
       (_) {
         state = AsyncData(previous.where((c) => c.id != id).toList());

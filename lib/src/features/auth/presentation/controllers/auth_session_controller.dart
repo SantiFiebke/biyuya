@@ -8,6 +8,7 @@ import 'package:biyuya/src/features/auth/provider/household_members_provider.dar
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:logger/logger.dart';
 import 'package:multiple_result/multiple_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -60,6 +61,7 @@ class AuthSessionController extends _$AuthSessionController {
       unawaited(_profileSubscription?.cancel());
       _profileSubscription = null;
       unawaited(WidgetDailyTotalSync.clearTotal());
+      ref.invalidate(settingsControllerProvider);
     }, (failure) => throw Exception(failure.message));
   }
 
@@ -88,7 +90,8 @@ class AuthSessionController extends _$AuthSessionController {
       ..invalidate(categoryControllerProvider)
       ..invalidate(expenseControllerProvider)
       ..invalidate(householdNameProvider)
-      ..invalidate(householdMembersProvider);
+      ..invalidate(householdMembersProvider)
+      ..invalidate(settingsControllerProvider);
   }
 
   void _subscribeToProfileChanges(

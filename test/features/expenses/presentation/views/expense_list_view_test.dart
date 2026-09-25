@@ -8,6 +8,8 @@ import 'package:biyuya/src/features/categories/presentation/controllers/category
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/views/expense_list_view.dart';
+import 'package:biyuya/src/features/settings/domain/entities/user_settings.dart';
+import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:flutter/services.dart' show SystemChannels;
 import 'package:flutter_localizations/flutter_localizations.dart'
     show GlobalCupertinoLocalizations, GlobalWidgetsLocalizations;
@@ -60,6 +62,15 @@ final _testExpenses = [
   ),
 ];
 
+// Bypasses SettingsController.build() _load (hits Supabase otherwise).
+Override _settingsOverride({bool enabled = true}) => settingsControllerProvider
+    .overrideWithValue(AsyncData(UserSettings(debtSettlementEnabled: enabled)));
+
+// Real householdMembersProvider pulls authSession -> Supabase in tests.
+Override _emptyMembersOverride() => householdMembersProvider.overrideWithValue(
+  const AsyncData<List<UserProfile>>([]),
+);
+
 void main() {
   setUpAll(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -81,6 +92,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );
@@ -100,6 +113,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );
@@ -121,6 +136,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );
@@ -154,6 +171,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );
@@ -178,6 +197,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );
@@ -198,6 +219,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               const AsyncData<List<Expense>>([]),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );
@@ -218,6 +241,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>(_testExpenses),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );
@@ -225,6 +250,106 @@ void main() {
 
       expect(find.byType(FloatingActionButton), findsOneWidget);
       expect(find.byIcon(Icons.add), findsOneWidget);
+    });
+
+    testWidgets('"Liquidar deudas" opens debt settlement sheet', (
+      tester,
+    ) async {
+      final now = DateTime.now();
+      final currentMonthExpenses = [
+        Expense(
+          id: 1,
+          amount: 200,
+          date: now,
+          description: 'Groceries',
+          householdId: 1,
+          categoryId: 1,
+          userUuid: 'user-1',
+          createdAt: now,
+        ),
+        Expense(
+          id: 2,
+          amount: 50,
+          date: now,
+          description: 'Bus ticket',
+          householdId: 1,
+          categoryId: 2,
+          userUuid: 'user-2',
+          createdAt: now,
+        ),
+      ];
+      const members = [
+        UserProfile(
+          id: 'user-1',
+          name: 'Alice',
+          lastName: 'Smith',
+          householdId: '1',
+        ),
+        UserProfile(
+          id: 'user-2',
+          name: 'Bob',
+          lastName: 'Jones',
+          householdId: '1',
+        ),
+      ];
+
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(currentMonthExpenses),
+            ),
+            householdMembersProvider.overrideWithValue(
+              const AsyncData<List<UserProfile>>(members),
+            ),
+            _settingsOverride(),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Liquidar deudas'), findsOneWidget);
+
+      await tester.tap(find.text('Liquidar deudas'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Liquidación de deudas'), findsOneWidget);
+    });
+
+    testWidgets('"Liquidar deudas" hidden when debt settlement is disabled', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapTest(
+          child: const ExpenseListView(),
+          overrides: [
+            categoryControllerProvider.overrideWithValue(
+              AsyncData<List<Category>>(_testCategories),
+            ),
+            expenseControllerProvider.overrideWithValue(
+              AsyncData<List<Expense>>(_testExpenses),
+            ),
+            householdMembersProvider.overrideWithValue(
+              const AsyncData<List<UserProfile>>([
+                UserProfile(
+                  id: 'user-1',
+                  name: 'Alice',
+                  lastName: 'Smith',
+                  householdId: '1',
+                ),
+              ]),
+            ),
+            _settingsOverride(enabled: false),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Liquidar deudas'), findsNothing);
     });
   });
 
@@ -299,6 +424,7 @@ void main() {
       householdMembersProvider.overrideWithValue(
         AsyncData<List<UserProfile>>(members),
       ),
+      _settingsOverride(),
     ];
 
     testWidgets('hides "Usuario" chip when household has a single member', (
@@ -443,6 +569,7 @@ void main() {
         householdMembersProvider.overrideWithValue(
           AsyncData<List<UserProfile>>(singleMember),
         ),
+        _settingsOverride(),
       ]);
       await tester.pumpAndSettle();
       await tester.pumpAndSettle();
@@ -468,6 +595,8 @@ void main() {
         expenseControllerProvider.overrideWithValue(
           AsyncData<List<Expense>>(expenses ?? _testExpenses),
         ),
+      _settingsOverride(),
+      _emptyMembersOverride(),
     ];
 
     testWidgets('shows edit and delete menu items', (tester) async {
@@ -589,6 +718,8 @@ void main() {
       expenseControllerProvider.overrideWithValue(
         AsyncData<List<Expense>>(expenses),
       ),
+      _settingsOverride(),
+      _emptyMembersOverride(),
     ];
 
     testWidgets('shows PendingBadge only for the non-synced expense', (
@@ -817,6 +948,8 @@ void main() {
             expenseControllerProvider.overrideWithValue(
               AsyncData<List<Expense>>([duplicateA, duplicateB, unique]),
             ),
+            _settingsOverride(),
+            _emptyMembersOverride(),
           ],
         ),
       );

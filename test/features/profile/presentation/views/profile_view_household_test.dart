@@ -6,6 +6,9 @@ import 'package:biyuya/src/features/auth/domain/repositories/auth_repository_bas
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/profile/presentation/views/profile_view.dart';
+import 'package:biyuya/src/features/settings/domain/entities/user_settings.dart';
+import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show AsyncData;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:multiple_result/multiple_result.dart' as mr;
@@ -45,6 +48,8 @@ class _FakeHouseholdName extends HouseholdName {
 List<Override> _overrides(_FakeSession session) => [
   authSessionControllerProvider.overrideWith(() => session),
   householdNameProvider.overrideWith(_FakeHouseholdName.new),
+  // Bypasses SettingsController.build() _load (hits Supabase otherwise).
+  settingsControllerProvider.overrideWithValue(const AsyncData(UserSettings())),
 ];
 
 void main() {

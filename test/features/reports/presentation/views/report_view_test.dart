@@ -6,6 +6,7 @@ import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.d
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:biyuya/src/features/reports/presentation/views/report_view.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/insights_section.dart';
 import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,7 +48,11 @@ void main() {
 
   final theme = MaterialTheme(ThemeData().textTheme).light();
 
-  CategoryBreakdown breakdown({double amount = 600, double? budgetAmount}) {
+  CategoryBreakdown breakdown({
+    double amount = 600,
+    double? budgetAmount,
+    double previousAmount = 0,
+  }) {
     return CategoryBreakdown(
       categoryId: 1,
       categoryName: 'Food',
@@ -56,6 +61,7 @@ void main() {
       categoryColor: '#4CAF50',
       categoryIcon: '63046',
       budgetAmount: budgetAmount,
+      previousAmount: previousAmount,
     );
   }
 
@@ -250,6 +256,73 @@ void main() {
         find.byType(LinearProgressIndicator),
       );
       expect(bar.color, theme.extension<AppColors>()!.income);
+    });
+
+    testWidgets('month with 0 current spending hides insights section', (
+      tester,
+    ) async {
+      stubReport(
+        makeReport(
+          total: 0,
+          categoryBreakdowns: [
+            const CategoryBreakdown(
+              categoryId: 1,
+              categoryName: 'Food',
+              amount: 0,
+              percentage: 0,
+              previousAmount: 100,
+            ),
+          ],
+        ),
+      );
+
+      await pumpReport(tester);
+
+      expect(find.text('No hay gastos este mes'), findsOneWidget);
+      expect(find.text('Insights del mes'), findsNothing);
+    });
+
+    testWidgets('shows insights when spending has qualified change', (
+      tester,
+    ) async {
+      // amount 600 vs previous 480 → +25% (>= 20% umbral).
+      stubReport(
+        makeReport(categoryBreakdowns: [breakdown(previousAmount: 480)]),
+      );
+
+      await pumpReport(tester);
+
+      expect(find.text('Desglose por categoría'), findsOneWidget);
+      expect(find.text('Insights del mes'), findsOneWidget);
+      expect(find.byType(InsightCard), findsOneWidget);
+    });
+
+    testWidgets('hides insights when no change qualifies', (tester) async {
+      // previousAmount 0 en todas → sin base, ningún insight calificado.
+      stubReport(
+        makeReport(categoryBreakdowns: [breakdown(), breakdown(amount: 400)]),
+      );
+
+      await pumpReport(tester);
+
+      expect(find.text('Desglose por categoría'), findsOneWidget);
+      expect(find.byType(CategoryBreakdownTile), findsNWidgets(2));
+      expect(find.text('Insights del mes'), findsNothing);
+      expect(find.byType(InsightCard), findsNothing);
+    });
+
+    testWidgets('hides insights when change is below threshold', (
+      tester,
+    ) async {
+      // 600 vs 550 → +9.1% (< 20% umbral) → ningún insight calificado.
+      stubReport(
+        makeReport(categoryBreakdowns: [breakdown(previousAmount: 550)]),
+      );
+
+      await pumpReport(tester);
+
+      expect(find.text('Insights del mes'), findsNothing);
+      expect(find.byType(InsightCard), findsNothing);
     });
   });
 }

@@ -6,6 +6,7 @@ import 'package:biyuya/src/features/auth/domain/entities/household_data.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/provider/household_provider.dart';
 import 'package:biyuya/src/features/profile/presentation/widgets/delete_household_dialog.dart';
+import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -181,6 +182,23 @@ class _MenuItems extends ConsumerWidget {
             subtitle: const Text('Cambiar tema de la app'),
             value: ref.watch(themeProvider).isDark,
             onChanged: (_) => ref.read(themeProvider.notifier).toggle(),
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.handshake_outlined),
+            title: const Text('Liquidación de deudas'),
+            subtitle: const Text(
+              'Mostrar saldos y transfers entre miembros del hogar',
+            ),
+            value:
+                ref
+                    .watch(settingsControllerProvider)
+                    .value
+                    ?.debtSettlementEnabled ??
+                true,
+            onChanged: (v) => ref
+                .read(settingsControllerProvider.notifier)
+                .toggle(enabled: v),
           ),
         ],
       ),

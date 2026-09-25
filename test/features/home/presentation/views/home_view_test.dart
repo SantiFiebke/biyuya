@@ -79,6 +79,12 @@ void main() {
       expect(find.textContaining('100,00', findRichText: true), findsWidgets);
     });
 
+    testWidgets('renders month projection card', (tester) async {
+      await _pumpHome(tester);
+
+      expect(find.text('Proyección fin de mes'), findsOneWidget);
+    });
+
     testWidgets('renders quick actions', (tester) async {
       await _pumpHome(tester);
 

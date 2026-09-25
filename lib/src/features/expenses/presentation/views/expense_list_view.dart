@@ -16,7 +16,10 @@ import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/domain/utils/duplicate_detection.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/category_filter_sheet.dart';
+import 'package:biyuya/src/features/expenses/presentation/widgets/debt_settlement_sheet.dart';
 import 'package:biyuya/src/features/expenses/presentation/widgets/member_filter_sheet.dart';
+import 'package:biyuya/src/features/expenses/provider/debt_settlement_provider.dart';
+import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:flutter/services.dart';
@@ -83,6 +86,14 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     setState(() => _selectedUserUuid = result);
   }
 
+  Future<void> _showDebtSettlement() async {
+    final now = DateTime.now();
+    final transfers = ref.read(
+      debtSettlementProvider(year: now.year, month: now.month),
+    );
+    await showDebtSettlementSheet(context, transfers: transfers);
+  }
+
   List<Expense> _filterExpenses(List<Expense> expenses) {
     var filtered = expenses;
 
@@ -145,9 +156,22 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     });
 
     final showMemberChip = asyncMembers.hasValue && members.length > 1;
+    final debtSettlementEnabled =
+        ref.watch(settingsControllerProvider).value?.debtSettlementEnabled ??
+        true;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Gastos')),
+      appBar: AppBar(
+        title: const Text('Gastos'),
+        actions: [
+          if (debtSettlementEnabled)
+            TextButton.icon(
+              onPressed: _showDebtSettlement,
+              icon: const Icon(Icons.swap_horiz, size: 18),
+              label: const Text('Liquidar deudas'),
+            ),
+        ],
+      ),
       body: Column(
         children: [
           // 1. Filter bar

@@ -9,6 +9,7 @@ class CategoryBreakdown extends Equatable {
     this.categoryColor,
     this.categoryIcon,
     this.budgetAmount,
+    this.previousAmount = 0,
   });
 
   final int categoryId;
@@ -19,6 +20,9 @@ class CategoryBreakdown extends Equatable {
   final double percentage;
   final double? budgetAmount;
 
+  /// Total del mismo mes anterior. 0 si la categoría no tuvo gastos entonces.
+  final double previousAmount;
+
   @override
   List<Object?> get props => [
     categoryId,
@@ -28,5 +32,6 @@ class CategoryBreakdown extends Equatable {
     categoryColor,
     categoryIcon,
     budgetAmount,
+    previousAmount,
   ];
 }
