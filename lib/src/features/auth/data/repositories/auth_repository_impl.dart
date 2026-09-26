@@ -54,6 +54,7 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     required String password,
     required String name,
     required String lastName,
+    required bool acceptedTerms,
   }) async {
     try {
       // 1. Registro técnico pasando metadata de usuario a Supabase Auth
@@ -61,7 +62,13 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
           .signUp(
             email: email,
             password: password,
-            data: {'first_name': name, 'last_name': lastName},
+            data: {
+              'first_name': name,
+              'last_name': lastName,
+              'accepted_terms': acceptedTerms,
+              'accepted_at': DateTime.now().toUtc().toIso8601String(),
+              'terms_version': '1.0',
+            },
           )
           .timeout(kNetworkTimeout);
 
@@ -216,5 +223,25 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
     } on Exception catch (e) {
       return Error(AuthFailure('Error al eliminar el hogar: $e'));
     }
+  }
+
+  @override
+  Future<Result<void, AuthFailure>> deleteAccount() async {
+    try {
+      await _client.functions.invoke('delete-account').timeout(kNetworkTimeout);
+    } on Exception catch (e) {
+      return Error(AuthFailure('No se pudo eliminar la cuenta: $e'));
+    }
+
+    // La cuenta ya no existe en Auth: cerrar sesión local (sin llamada de
+    // red, el refresh token fue revocado) y limpiar cachés como en signOut.
+    try {
+      await _client.auth.signOut();
+    } on Exception catch (_) {
+      // ignorado: el usuario ya fue eliminado
+    }
+    await _profileCache.clear();
+    await _categoryCache.clear();
+    return const Success(null);
   }
 }

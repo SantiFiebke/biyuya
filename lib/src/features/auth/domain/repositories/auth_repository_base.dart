@@ -26,6 +26,7 @@ abstract class AuthRepositoryBase {
     required String password,
     required String name,
     required String lastName,
+    required bool acceptedTerms,
   });
 
   /// Login tradicional
@@ -60,4 +61,7 @@ abstract class AuthRepositoryBase {
 
   /// Elimina el hogar actual (solo admin)
   Future<Result<void, AuthFailure>> deleteHousehold();
+
+  /// Elimina la cuenta del usuario actual y todos sus datos
+  Future<Result<void, AuthFailure>> deleteAccount();
 }

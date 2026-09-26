@@ -121,6 +121,7 @@ void main() {
             password: any(named: 'password'),
             name: any(named: 'name'),
             lastName: any(named: 'lastName'),
+            acceptedTerms: any(named: 'acceptedTerms'),
           ),
         ).thenAnswer(
           (_) async =>
@@ -136,6 +137,7 @@ void main() {
           password: 'pass123',
           name: 'John',
           lastName: 'Doe',
+          acceptedTerms: true,
         );
 
         verify(
@@ -144,6 +146,7 @@ void main() {
             password: 'pass123',
             name: 'John',
             lastName: 'Doe',
+            acceptedTerms: true,
           ),
         ).called(1);
       });
@@ -155,6 +158,7 @@ void main() {
             password: any(named: 'password'),
             name: any(named: 'name'),
             lastName: any(named: 'lastName'),
+            acceptedTerms: any(named: 'acceptedTerms'),
           ),
         ).thenAnswer(
           (_) async => const Error(AuthFailure('Email already in use')),
@@ -169,6 +173,7 @@ void main() {
           password: 'pass123',
           name: 'Jane',
           lastName: 'Doe',
+          acceptedTerms: true,
         );
 
         final state = container.read(authFormControllerProvider);

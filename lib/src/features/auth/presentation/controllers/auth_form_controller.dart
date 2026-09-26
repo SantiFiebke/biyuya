@@ -28,6 +28,7 @@ class AuthFormController extends _$AuthFormController {
     required String password,
     required String name,
     required String lastName,
+    required bool acceptedTerms,
   }) async {
     state = const AsyncLoading();
 
@@ -37,6 +38,7 @@ class AuthFormController extends _$AuthFormController {
       password: password,
       name: name,
       lastName: lastName,
+      acceptedTerms: acceptedTerms,
     );
 
     _handleResult(result);

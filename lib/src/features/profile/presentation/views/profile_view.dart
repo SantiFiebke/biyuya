@@ -1,3 +1,4 @@
+import 'package:biyuya/src/core/config/legal_config.dart';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/dialogs/confirm_action_dialog.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
@@ -11,6 +12,7 @@ import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileView extends ConsumerWidget {
   const ProfileView({super.key});
@@ -63,6 +65,10 @@ class ProfileContent extends StatelessWidget {
           const _MenuItems(),
           const SizedBox(height: 16),
           const _HouseholdActionsCard(),
+          const SizedBox(height: 16),
+          const _DeleteAccountTile(),
+          const SizedBox(height: 16),
+          const _LegalCard(),
           const SizedBox(height: 24),
           const _LogoutButton(),
         ],
@@ -378,6 +384,102 @@ class _HouseholdActionsCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _DeleteAccountTile extends ConsumerWidget {
+  const _DeleteAccountTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          Icons.person_remove_outlined,
+          color: Theme.of(context).colorScheme.error,
+        ),
+        title: const Text('Eliminar cuenta'),
+        subtitle: const Text('Elimina tu cuenta y todos tus datos'),
+        onTap: () async {
+          final confirmed = await showConfirmActionDialog(
+            context: context,
+            title: 'Eliminar cuenta',
+            content:
+                '¿Seguro que querés eliminar tu cuenta? Se borrarán todos tus datos de forma permanente.',
+            confirmLabel: 'Eliminar',
+            isDestructive: true,
+          );
+          if (!confirmed || !context.mounted) {
+            return;
+          }
+
+          final result = await ref
+              .read(authSessionControllerProvider.notifier)
+              .deleteAccount();
+          if (!context.mounted) {
+            return;
+          }
+          result.when(
+            (_) => context.go(AppRoute.login.path),
+            (failure) => context.showErrorSnackBar(failure.message),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LegalCard extends StatelessWidget {
+  const _LegalCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Política de privacidad'),
+            subtitle: const Text('Cómo usamos tus datos'),
+            trailing: const Icon(Icons.open_in_new, size: 20),
+            onTap: () =>
+                _openExternalUrl(context, LegalConfig.privacyPolicyUrl),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Términos y condiciones'),
+            subtitle: const Text('Reglas de uso de la app'),
+            trailing: const Icon(Icons.open_in_new, size: 20),
+            onTap: () => _openExternalUrl(context, LegalConfig.termsUrl),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.link_outlined),
+            title: const Text('Eliminar cuenta (web)'),
+            subtitle: const Text('Pedir la baja desde el navegador'),
+            trailing: const Icon(Icons.open_in_new, size: 20),
+            onTap: () =>
+                _openExternalUrl(context, LegalConfig.accountDeletionUrl),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _openExternalUrl(BuildContext context, String url) async {
+  var launched = false;
+  try {
+    launched = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+  } on Exception {
+    launched = false;
+  }
+  if (!launched && context.mounted) {
+    context.showErrorSnackBar('No se pudo abrir el enlace');
   }
 }
 

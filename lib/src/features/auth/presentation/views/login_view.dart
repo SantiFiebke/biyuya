@@ -71,7 +71,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Cuentas claras',
+                    'Biyuya - Cuentas claras',
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.primary,

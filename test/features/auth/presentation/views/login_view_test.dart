@@ -21,6 +21,7 @@ class _NoopAuthFormController extends AuthFormController {
     required String password,
     required String name,
     required String lastName,
+    required bool acceptedTerms,
   }) async {}
 }
 

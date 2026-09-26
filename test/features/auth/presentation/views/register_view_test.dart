@@ -17,6 +17,7 @@ class _NoopAuthFormController extends AuthFormController {
     required String password,
     required String name,
     required String lastName,
+    required bool acceptedTerms,
   }) async {}
 
   @override
@@ -56,6 +57,9 @@ void main() {
         'abcdef',
       );
 
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Registrarme'));
       await tester.tap(find.text('Registrarme'));
       await tester.pumpAndSettle();
@@ -74,6 +78,9 @@ void main() {
         'foo',
       );
 
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Registrarme'));
       await tester.tap(find.text('Registrarme'));
       await tester.pumpAndSettle();
@@ -96,6 +103,9 @@ void main() {
         'Xyz1234',
       );
 
+      await tester.ensureVisible(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Registrarme'));
       await tester.tap(find.text('Registrarme'));
       await tester.pumpAndSettle();

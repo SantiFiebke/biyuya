@@ -59,6 +59,7 @@ class FakeAuthRepository implements AuthRepositoryBase {
     required String password,
     required String name,
     required String lastName,
+    required bool acceptedTerms,
   }) => throw UnimplementedError();
 
   @override
@@ -85,6 +86,10 @@ class FakeAuthRepository implements AuthRepositoryBase {
 
   @override
   Future<mr.Result<void, AuthFailure>> deleteHousehold() =>
+      throw UnimplementedError();
+
+  @override
+  Future<mr.Result<void, AuthFailure>> deleteAccount() =>
       throw UnimplementedError();
 }
 

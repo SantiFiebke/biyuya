@@ -85,6 +85,18 @@ class AuthSessionController extends _$AuthSessionController {
     return result;
   }
 
+  Future<Result<void, AuthFailure>> deleteAccount() async {
+    final repository = ref.read(authRepositoryProvider);
+    final result = await repository.deleteAccount();
+    result.when((_) {
+      unawaited(_profileSubscription?.cancel());
+      _profileSubscription = null;
+      unawaited(WidgetDailyTotalSync.clearTotal());
+      ref.invalidate(settingsControllerProvider);
+    }, (_) {});
+    return result;
+  }
+
   void _invalidateHouseholdData() {
     ref
       ..invalidate(categoryControllerProvider)

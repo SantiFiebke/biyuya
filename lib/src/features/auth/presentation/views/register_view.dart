@@ -1,9 +1,21 @@
+import 'package:biyuya/src/core/config/legal_config.dart';
 import 'package:biyuya/src/core/presentation/extensions/context_extensions.dart';
 import 'package:biyuya/src/core/presentation/utils/form_validators.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_form_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+Future<void> _openLegalUrl(BuildContext context, String url) async {
+  try {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  } on Exception {
+    if (context.mounted) {
+      context.showErrorSnackBar('No se pudo abrir el enlace');
+    }
+  }
+}
 
 class RegisterView extends ConsumerStatefulWidget {
   const RegisterView({super.key});
@@ -21,6 +33,8 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
   final _confirmPasswordController = TextEditingController();
 
   bool showPassword = false;
+  // Never pre-checked: GDPR consent must be explicit.
+  bool _acceptedTerms = false;
 
   @override
   void dispose() {
@@ -33,6 +47,9 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
   }
 
   Future<void> _submit() async {
+    if (!_acceptedTerms) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -44,6 +61,7 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
           lastName: _lastNameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text,
+          acceptedTerms: _acceptedTerms,
         );
   }
 
@@ -176,9 +194,18 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
                   ),
                   const SizedBox(height: 28),
 
+                  // Consentimiento explícito (GDPR)
+                  TermsConsentCheckbox(
+                    value: _acceptedTerms,
+                    onChanged: isLoading
+                        ? null
+                        : (v) => setState(() => _acceptedTerms = v ?? false),
+                  ),
+                  const SizedBox(height: 16),
+
                   // Botón de Envío
                   ElevatedButton(
-                    onPressed: isLoading ? null : _submit,
+                    onPressed: isLoading || !_acceptedTerms ? null : _submit,
                     child: isLoading
                         ? const SizedBox(
                             height: 20,
@@ -192,6 +219,50 @@ class _RegisterViewState extends ConsumerState<RegisterView> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Consentimiento GDPR: checkbox sin pre-seleccionar con enlaces legales.
+/// Dumb widget — el estado vive en [RegisterView].
+class TermsConsentCheckbox extends StatelessWidget {
+  const TermsConsentCheckbox({
+    required this.value,
+    required this.onChanged,
+    super.key,
+  });
+
+  final bool value;
+  final ValueChanged<bool?>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final linkStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: Theme.of(context).colorScheme.primary,
+      decoration: TextDecoration.underline,
+    );
+
+    return CheckboxListTile(
+      value: value,
+      onChanged: onChanged,
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text('Acepto los '),
+          InkWell(
+            onTap: () => _openLegalUrl(context, LegalConfig.termsUrl),
+            child: Text('Términos y Condiciones', style: linkStyle),
+          ),
+          const Text(' y la '),
+          InkWell(
+            onTap: () => _openLegalUrl(context, LegalConfig.privacyPolicyUrl),
+            child: Text('Política de Privacidad', style: linkStyle),
+          ),
+        ],
       ),
     );
   }

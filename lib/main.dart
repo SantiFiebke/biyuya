@@ -120,7 +120,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     final theme = MaterialTheme(textTheme);
 
     return MaterialApp.router(
-      title: 'Cuentas claras',
+      title: 'Biyuya - Cuentas claras',
       debugShowCheckedModeBanner: false,
       theme: theme.light(),
       darkTheme: theme.dark(),

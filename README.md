@@ -1,7 +1,7 @@
-# 💰 Cuentas Claras (Biyuya)
+# 💰 Biyuya - Cuentas claras
 
 <!-- Logo placeholder - reemplazar con el logo real de la app -->
-<!-- <p align="center"><img src="docs/logo.png" width="150" alt="Cuentas Claras Logo"/></p> -->
+<!-- <p align="center"><img src="docs/logo.png" width="150" alt="Biyuya - Cuentas claras Logo"/></p> -->
 
 <p align="center">
   <strong>App móvil para el seguimiento de gastos de un hogar</strong>
@@ -48,7 +48,7 @@
 
 ### Propósito de la Aplicación
 
-**Cuentas claras** es una aplicación móvil diseñada para simplificar el control de gastos domésticos. Permite que múltiples miembros de un mismo hogar registren, compartan y visualicen los gastos del hogar de forma colaborativa y ordenada.
+**Biyuya - Cuentas claras** es una aplicación móvil diseñada para simplificar el control de gastos domésticos. Permite que múltiples miembros de un mismo hogar registren, compartan y visualicen los gastos del hogar de forma colaborativa y ordenada.
 
 ### Usuarios Objetivo
 

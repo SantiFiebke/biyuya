@@ -170,12 +170,15 @@ GoRouter router(Ref ref) {
           final loc = state.matchedLocation;
           final isLoggingIn = loc == AppRoute.login.path;
           final isRegistering = loc == AppRoute.register.path;
-          final isVerifyingEmail = loc == AppRoute.verifyEmail.path;
+          // ponytail: techo — verificar email deshabilitado; reactivar este
+          // guard junto con "Confirm email" en Supabase (y la ruta
+          // verifyEmail en app_routes.dart).
+          // final isVerifyingEmail = loc == AppRoute.verifyEmail.path;
 
           // 1. Without session
           if (userProfile == null) {
             FlutterNativeSplash.remove();
-            return (isLoggingIn || isRegistering || isVerifyingEmail)
+            return (isLoggingIn || isRegistering /* || isVerifyingEmail */ )
                 ? null
                 : AppRoute.login.path;
           }
@@ -200,7 +203,7 @@ GoRouter router(Ref ref) {
           // 4. With valid session and household
           if (isLoggingIn ||
               isRegistering ||
-              isVerifyingEmail ||
+              // isVerifyingEmail ||  // ver nota del guard de arriba
               loc == AppRoute.splash.path ||
               loc == AppRoute.onboarding.path) {
             return AppRoute.home.path;

@@ -57,3 +57,8 @@ supabase/.temp/
 # Backup dumps
 backups/
 scripts/
+
+# Android signing (defensa en profundidad; android/.gitignore ya los cubre)
+android/key.properties
+*.jks
+*.keystore
