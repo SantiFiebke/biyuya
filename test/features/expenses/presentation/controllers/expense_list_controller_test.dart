@@ -1,8 +1,12 @@
+import 'package:biyuya/src/core/network/connectivity_provider.dart';
+import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/data/local/pending_expense_store.dart';
 import 'package:biyuya/src/features/expenses/data/repositories/expense_repository_impl.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/domain/repositories/expense_repository_base.dart';
+import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_list_controller.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
@@ -10,10 +14,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../../../../helpers/test_helpers.dart';
 
 class MockExpenseRepository extends Mock implements ExpenseRepositoryImpl {}
+
+class MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
+
+class MockGoTrueClient extends Mock implements supabase.GoTrueClient {}
+
+class MockUser extends Mock implements supabase.User {}
 
 /// In-memory [PendingExpenseStore] — never touches SharedPreferences.
 class FakePendingExpenseStore extends PendingExpenseStore {
@@ -87,7 +99,12 @@ Expense expense({
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late MockExpenseRepository repo;
+  late MockSupabaseClient mockSupabaseClient;
+  late MockGoTrueClient mockGoTrueClient;
+  late MockUser mockUser;
   late FakePendingExpenseStore store;
   late List<PageCall> calls;
   late List<Expense> serverItems;
@@ -103,6 +120,9 @@ void main() {
 
   setUp(() {
     repo = MockExpenseRepository();
+    mockSupabaseClient = MockSupabaseClient();
+    mockGoTrueClient = MockGoTrueClient();
+    mockUser = MockUser();
     store = FakePendingExpenseStore();
     calls = [];
     serverItems = [];
@@ -156,6 +176,37 @@ void main() {
       return Success(filtered.skip(call.offset).take(call.limit).toList());
     });
 
+    // ExpenseController auto-load / _reloadMerge default to an empty month.
+    when(
+      () => repo.getExpensesByMonth(
+        householdId: 1,
+        year: any(named: 'year'),
+        month: any(named: 'month'),
+      ),
+    ).thenAnswer((_) async => const Success([]));
+
+    // Sync flush fails (offline): the pending expense stays in the outbox so
+    // the list refresh deterministically sees it.
+    when(
+      () => repo.createExpense(
+        amount: any(named: 'amount'),
+        date: any(named: 'date'),
+        householdId: any(named: 'householdId'),
+        categoryId: any(named: 'categoryId'),
+        userUuid: any(named: 'userUuid'),
+        description: any(named: 'description'),
+        clientId: any(named: 'clientId'),
+      ),
+    ).thenAnswer((_) async => const Error(ExpenseFailure('offline')));
+
+    // _userUuid reads the Supabase auth session.
+    when(() => mockSupabaseClient.auth).thenReturn(mockGoTrueClient);
+    when(() => mockGoTrueClient.currentUser).thenReturn(mockUser);
+    when(() => mockUser.id).thenReturn('test-user-id');
+
+    // _emitExpenses writes the native widget total via SharedPreferences.
+    SharedPreferences.setMockInitialValues({});
+
     container = ProviderContainer(
       overrides: [
         expenseRepositoryProvider.overrideWithValue(repo),
@@ -163,6 +214,19 @@ void main() {
           FakeAuthSessionController.new,
         ),
         pendingExpenseStoreProvider.overrideWithValue(store),
+        // _emitExpenses reads categories for the featured chips; keep the
+        // real Supabase-backed repository out of the test.
+        categoryControllerProvider.overrideWithValue(
+          AsyncData([
+            makeCategory(name: 'Food'),
+            makeCategory(id: 2, name: 'Transport'),
+          ]),
+        ),
+        supabaseClientProvider.overrideWithValue(mockSupabaseClient),
+        // Static stream: avoids the reconnect retrySync racing assertions.
+        isOnlineProvider.overrideWith(
+          (ref) => Stream<bool>.value(false),
+        ),
       ],
     );
   });
@@ -378,6 +442,46 @@ void main() {
       expect(state.items.first.id, -1);
       expect(state.items.where((e) => e.clientId == 'c1'), hasLength(1));
       expect(state.hasMore, isTrue);
+    });
+  });
+
+  group('ExpenseController.createExpense refreshes the list (TEST-001)', () {
+    // Regression: creating an expense did not invalidate
+    // expenseListControllerProvider, so the list view stayed stale.
+    test('pending expense shows up after createExpense', () async {
+      serverItems = [];
+
+      container.read(expenseListControllerProvider);
+      await settle();
+      expect(container.read(expenseListControllerProvider).items, isEmpty);
+
+      final created = await container
+          .read(expenseControllerProvider.notifier)
+          .createExpense(
+            amount: 42.5,
+            date: DateTime(2025, 7, 20),
+            categoryId: 2,
+            description: 'Café',
+          );
+      expect(created, isTrue);
+      await settle();
+
+      // Rebuild after invalidation, then let the initial refresh microtask
+      // fetch page 0 and merge the outbox.
+      container.read(expenseListControllerProvider);
+      await settle();
+
+      final state = container.read(expenseListControllerProvider);
+      expect(state.items, hasLength(1));
+      final item = state.items.single;
+      expect(item.amount, 42.5);
+      expect(item.categoryId, 2);
+      expect(item.description, 'Café');
+      expect(item.syncStatus, ExpenseSyncStatus.pending);
+      expect(item.clientId, isNotNull);
+      expect(item.householdId, 1);
+      expect(item.userUuid, 'test-user-id');
+      expect(calls, hasLength(2));
     });
   });
 }

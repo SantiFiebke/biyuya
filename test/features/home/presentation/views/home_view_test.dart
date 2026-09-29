@@ -98,7 +98,7 @@ void main() {
     testWidgets('renders app bar title', (tester) async {
       await _pumpHome(tester);
 
-      expect(find.text('Cuentas claras'), findsOneWidget);
+      expect(find.text('Biyuya - Cuentas claras'), findsOneWidget);
     });
 
     testWidgets('balance card shows monthly label and amount', (tester) async {

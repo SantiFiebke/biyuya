@@ -45,7 +45,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Cuentas claras'), findsOneWidget);
+      expect(find.text('Biyuya - Cuentas claras'), findsOneWidget);
       expect(find.text('Control de gastos transparente'), findsOneWidget);
       expect(
         find.widgetWithText(TextFormField, 'Correo electrónico'),
