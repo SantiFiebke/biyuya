@@ -1,241 +1,178 @@
 # 💰 Biyuya - Cuentas claras
 
-<!-- Logo placeholder - reemplazar con el logo real de la app -->
-<!-- <p align="center"><img src="docs/logo.png" width="150" alt="Biyuya - Cuentas claras Logo"/></p> -->
+Aplicación móvil para el seguimiento de los gastos compartidos de un hogar.
 
-<p align="center">
-  <strong>App móvil para el seguimiento de gastos de un hogar</strong>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.12.2-02569B?logo=flutter" alt="Flutter">
+<p>
+  <img src="https://img.shields.io/badge/Flutter-3.47.2-02569B?logo=flutter" alt="Flutter">
   <img src="https://img.shields.io/badge/Dart-3.12.2-0175C2?logo=dart" alt="Dart">
   <img src="https://img.shields.io/badge/Supabase-2.16.0-3FCF8E?logo=supabase" alt="Supabase">
-  <img src="https://img.shields.io/badge/Licencia-MIT-green" alt="License MIT">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-green" alt="Licencia MIT"></a>
+  <img src="https://img.shields.io/badge/tests-495-blue" alt="Tests">
 </p>
 
-<p align="center">
-  Modelo familiar/compartido: los usuarios crean o se unen a un <em>hogar</em> mediante código de invitación,
-  registran gastos por categoría, y visualizan reportes mensuales con desglose por categoría.
-</p>
+**Biyuya - Cuentas claras** es un tracker de gastos para el hogar. Los usuarios crean o se unen a un hogar mediante un código de invitación, registran gastos por categoría y consultan reportes mensuales. Incluye captura offline (los gastos se guardan en una cola local y se sincronizan al recuperar la conexión) y presupuestos por categoría.
 
 ---
 
-## 📋 Tabla de Contenidos
+## ✨ Funcionalidades
 
-1. [🎯 Objetivos](#-objetivos)
-2. [📸 Capturas](#-capturas)
-3. [🏗️ Arquitectura](#️-arquitectura)
-4. [🛠️ Tecnologías Utilizadas](#️-tecnologías-utilizadas)
-5. [📂 Estructura del Proyecto](#-estructura-del-proyecto)
-6. [🚀 Instalación y Configuración](#-instalación-y-configuración)
-7. [🔧 Desarrollo](#-desarrollo)
-8. [🧪 Pruebas](#-pruebas)
-9. [📦 Build](#-build)
-10. [🔐 Variables de Entorno](#-variables-de-entorno)
-11. [📊 Base de Datos](#-base-de-datos)
-12. [📴 Modo Offline (outbox + sync)](#-modo-offline-outbox--sync)
-13. [🔁 Detección de duplicados](#-detección-de-duplicados)
-14. [📱 Widget nativo](#-widget-nativo)
-15. [🔄 Flujo de Autenticación](#-flujo-de-autenticación)
-16. [🤝 Contribuir](#-contribuir)
-17. [📄 Licencia](#-licencia)
-18. [👥 Equipo / Contacto](#-equipo--contacto)
-
----
-
-## 🎯 Objetivos
-
-### Propósito de la Aplicación
-
-**Biyuya - Cuentas claras** es una aplicación móvil diseñada para simplificar el control de gastos domésticos. Permite que múltiples miembros de un mismo hogar registren, compartan y visualicen los gastos del hogar de forma colaborativa y ordenada.
-
-### Usuarios Objetivo
-
-- **Familias** que buscan organizar sus finanzas domésticas de forma compartida.
-- **Compañeros de roommate** que necesitan dividir y rastrear gastos comunes.
-- **Parejas** que desean llevar un registro transparente de sus gastos compartidos.
-
-### Propuesta de Valor
-
-| Problemática | Solución |
-|---|---|
-| Gastos domésticos descontrolados | Registro rápido por categoría con filtros mensuales |
-| Falta de transparencia entre miembros | Modelo compartido: todos ven los mismos datos en tiempo real |
-| Difícil identificar áreas de mayor gasto | Reportes mensuales con desglose por categoría |
-| Sin código de invitación → unirse a un hogar es sencillo | Código de invitación compartible al instante |
+- **Autenticación** — Login y registro con email y contraseña (Supabase Auth) y sesión persistente.
+- **Onboarding** — Crear un hogar nuevo (el creador queda como `owner`) o unirse con un código de invitación.
+- **Gastos** — CRUD completo, listado con filtros por categoría, miembro y rango de fechas, vista de detalle y detección de duplicados (informativa).
+- **Categorías** — CRUD, presupuesto mensual por categoría, bandera `is_expense` (excluye categorías no-gasto como *Ahorro* de los totales) y categorías por defecto sembradas al crear el hogar (Alimentos, Transporte, Vivienda, Servicios, Salud, Ocio, Educación, Otros).
+- **Reportes** — Desglose mensual del gasto por categoría e insights que comparan cada categoría contra el mes anterior.
+- **Home** — Dashboard con tarjeta de balance del mes, últimos gastos, acciones rápidas, checklist de primeros pasos (descartable) y tarjeta de proyección de gasto de fin de mes (según preferencia).
+- **Liquidación de deudas** — Cálculo de transferencias entre miembros para saldar el mes (algoritmo *min-cash-flow*), activable por preferencia.
+- **Perfil y ajustes** — Modo oscuro, activación de liquidación de deudas y proyección mensual, gestión del hogar (salir/eliminar), eliminación de cuenta, enlaces legales y cierre de sesión.
+- **Modo offline** — Outbox local de gastos pendientes y sincronización idempotente.
+- **Widget nativo** — Widget de Android con el total gastado hoy y accesos rápidos a categorías frecuentes.
+- **Deep links** — Esquema `biyuya://expense/new` para abrir el formulario de gasto.
+- **Aceptación de términos** — Checkbox obligatorio en el registro, con registro inmutable en la base de datos.
 
 ---
 
 ## 📸 Capturas
 
-> **TODO:** Agregar capturas de pantalla de la app. Sugerencias de screenshots:
->
-> - **Login / Registro** — Pantalla de autenticación con email y contraseña.
-> - **Onboarding** — Flujo de creación o unión a un hogar.
-> - **Dashboard** — Lista de últimos gastos, nombre del hogar y código de invitación.
-> - **Crear Gasto** — Formulario de registro de gasto con categoría y monto.
-> - **Reportes** — Vista de reporte mensual con desglose por categoría.
-> - **Perfil** — Vista del perfil del usuario.
-
-<!-- Sugerencia de implementación:
-```markdown
-| Dashboard | Reportes | Crear Gasto |
-|:---------:|:--------:|:-----------:|
-| <img src="docs/screenshots/home.png" width="250"/> | <img src="docs/screenshots/reports.png" width="250"/> | <img src="docs/screenshots/expense.png" width="250"/> |
-```
--->
+Capturas pendientes de agregar en `docs/screenshots/`.
 
 ---
 
 ## 🏗️ Arquitectura
 
-### Clean Architecture por Feature
+### Clean Architecture por feature
 
-El proyecto sigue **Clean Architecture** organizado por *feature*, separando responsabilidades en tres capas por cada funcionalidad:
+El proyecto sigue **Clean Architecture** organizado por *feature*. Cada funcionalidad separa responsabilidades en tres capas:
 
 ```
-┌─────────────────────────────────────────────┐
-│            presentation (UI)                │
-│   Widgets, Pages, Controllers (Riverpod)   │
-├─────────────────────────────────────────────┤
-│              domain (lógica)                │
-│      Entities, Repository interfaces       │
-├─────────────────────────────────────────────┤
-│               data (implementación)         │
-│    Repository impl, DataSources, Models    │
-└─────────────────────────────────────────────┘
-         ↕           ↕            ↕
-    Supabase     Supabase     Supabase
-      API          API          API
+┌──────────────────────────────────────────────┐
+│               presentation                    │
+│     Widgets, Views, Controllers (Riverpod)    │
+├──────────────────────────────────────────────┤
+│                 domain                        │
+│   Entidades, contratos (*_repository_base)    │
+├──────────────────────────────────────────────┤
+│                  data                         │
+│   Repositorios impl., data sources, modelos   │
+└──────────────────────────────────────────────┘
+                     ↕
+                 Supabase
 ```
 
-### Principios Clave
+### Principios clave
 
 | Concepto | Implementación |
 |---|---|
-| **State Management** | Riverpod 3.x con code generation (`@riverpod` annotations) |
-| **Navegación** | GoRouter 18.x con redirect basado en estado de autenticación |
-| **Error Handling** | `Result<T, Failure>` con `multiple_result` en repositorios |
-| **Entidades** | Todas extienden `Equatable` para comparación por valor |
-| **Backend** | Supabase (BaaS): Auth, Database, Realtime |
+| **State management** | Riverpod 3.x con code generation (`@riverpod`) |
+| **Navegación** | GoRouter 18.x con `redirect` basado en el estado de autenticación |
+| **Manejo de errores** | `Result<T, Failure>` con `multiple_result` en los repositorios |
+| **Entidades** | Extienden `Equatable` para comparación por valor |
+| **Backend** | Supabase (Auth + PostgreSQL) |
 
 ### Repository Pattern
 
-Cada feature expone un **repositorio** como contrato (interface en `domain/`) y una implementación en `data/`. El repository retorna `Result<T, Failure>` para forzar manejo explícito de errores.
+Cada feature expone un contrato en `domain/repositories/` con el sufijo `*_repository_base.dart`, y una implementación en `data/repositories/`. Los métodos retornan `Result<T, Failure>` para forzar el manejo explícito de errores.
 
 ```dart
-// Ejemplo: contrato en domain
-abstract class ExpenseRepository {
-  Future<Result<List<Expense>, Failure>> getExpenses({
-    required String householdId,
-    DateTime? startDate,
-    DateTime? endDate,
+// Contrato: lib/src/features/expenses/domain/repositories/expense_repository_base.dart
+abstract class ExpenseRepositoryBase {
+  Future<Result<List<Expense>, ExpenseFailure>> getExpenses({
+    required int householdId,
   });
-  Future<Result<void, Failure>> createExpense(Expense expense);
-  Future<Result<void, Failure>> deleteExpense(String expenseId);
+
+  Future<Result<Expense, ExpenseFailure>> createExpense({
+    required double amount,
+    required DateTime date,
+    required int householdId,
+    required int categoryId,
+    required String userUuid,
+    String? description,
+    String? clientId,
+  });
+
+  Future<Result<void, ExpenseFailure>> deleteExpense({required int id});
 }
 
-// Implementación en data — llama a Supabase
-class ExpenseRepositoryImpl implements ExpenseRepository { ... }
+// Implementación: lib/src/features/expenses/data/repositories/expense_repository_impl.dart
+class ExpenseRepositoryImpl implements ExpenseRepositoryBase { ... }
 ```
 
 ### Riverpod Code Generation
 
-Se usa `@riverpod` annotation + `riverpod_generator` para evitar boilerplate:
+Los providers se definen con la anotación `@riverpod` y se generan con `riverpod_generator`.
 
 ```dart
-// Provider de repositorio (functional)
 @riverpod
-ExpenseRepository expenseRepository(ExpenseRepositoryRef ref) {
+ExpenseRepositoryBase expenseRepository(Ref ref) {
   return ExpenseRepositoryImpl(
     supabaseClient: ref.watch(supabaseClientProvider),
   );
 }
 
-// Controller de estado (keepAlive para persistir durante la sesión)
 @Riverpod(keepAlive: true)
 class ExpenseController extends _$ExpenseController {
   @override
   Future<List<Expense>> build() async { ... }
-  Future<void> create(Expense expense) async { ... }
-  Future<void> delete(String id) async { ... }
 }
 ```
 
-### Providers Principales
-
-| Provider | Tipo | Alcance |
-|---|---|---|
-| `supabaseClient` | functional | Global |
-| `authRepository` | functional | Global |
-| `authSessionControllerProvider` | keepAlive | Global — sesión activa |
-| `householdNameProvider` | keepAlive | Global — nombre del hogar |
-| `expenseRepository` | functional | Feature expenses |
-| `expenseControllerProvider` | keepAlive | Feature expenses |
-| `categoryRepository` | functional | Feature categories |
-| `categoryControllerProvider` | keepAlive | Feature categories |
-| `reportRepository` | functional | Feature reports |
-| `reportControllerProvider` | keepAlive | Feature reports |
-| `routerProvider` | functional | Navigation |
-
 ---
 
-## 🛠️ Tecnologías Utilizadas
+## 🛠️ Tecnologías
 
 ### Core
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
-| Flutter SDK | ^3.12.2 | Framework multiplataforma |
-| Dart SDK | ^3.12.2 | Lenguaje de programación (`environment.sdk` en `pubspec.yaml`) |
+| Flutter | 3.47.2 | Framework multiplataforma |
+| Dart SDK | ^3.12.2 | Lenguaje (`environment.sdk` en `pubspec.yaml`) |
 
 ### State Management
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
-| flutter_riverpod | ^3.0.0 | State management basado en providers |
+| flutter_riverpod | ^3.0.0 | State management |
 | riverpod_annotation | ^4.0.0 | Anotaciones para code generation |
-| riverpod_generator | ^4.0.0+1 | Generador de código Riverpod |
+| riverpod_generator | ^4.0.0+1 | Generador de providers |
 
 ### Backend
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
-| supabase_flutter | ^2.16.0 | Backend as a Service (Auth, DB, Realtime) |
+| supabase_flutter | ^2.16.0 | Auth y base de datos (BaaS) |
+| shared_preferences | ^2.5.2 | Persistencia local ligera y outbox offline |
+| connectivity_plus | ^7.0.0 | Detección de conectividad para la sincronización |
 
 ### Navegación
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
-| go_router | ^18.0.1 | Declarative routing con redirects |
+| go_router | ^18.0.1 | Routing declarativo con redirects |
+| app_links | ^7.0.0 | Deep links (`biyuya://expense/new`) |
 
 ### UI & Utilidades
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
+| material_ui | ^1.2.0 | Componentes Material |
 | google_fonts | ^8.0.1 | Tipografías personalizadas |
-| intl | ^0.20.2 | Formateo de fechas, monedas y localización |
-| skeletonizer | ^2.1.3 | Skeleton loaders para carga de datos |
+| intl | ^0.20.2 | Formateo de fechas y monedas |
+| skeletonizer | ^2.1.3 | Skeleton loaders |
 | flutter_native_splash | ^2.4.5 | Splash screen nativo |
-| equatable | ^2.0.7 | Comparación por valor de entidades |
-| multiple_result | ^5.1.0 | Manejo de errores con Result<T, Failure> |
-| shared_preferences | ^2.5.2 | Persistencia local ligera y outbox offline |
-| connectivity_plus | ^7.0.0 | Detección de conectividad para sync |
+| equatable | ^2.0.7 | Comparación por valor |
+| multiple_result | ^5.1.0 | Manejo de errores `Result<T, Failure>` |
 | uuid | ^4.6.0 | Generación de `client_id` (uuid v4) |
-| app_links | ^7.0.0 | Deep links (`biyuya://expense/new`) |
+| url_launcher | ^6.3.2 | Apertura de enlaces legales externos |
 | logger | ^2.2.0 | Logging en desarrollo |
 
 ### Testing & Quality
 
 | Tecnología | Versión | Propósito |
 |---|---|---|
-| build_runner | ^2.15.0 | Code generation runner |
+| flutter_test | SDK | Framework de tests |
+| mocktail | ^1.0.4 | Mocking |
+| fake_async | ^1.3.3 | Control de tiempos asíncronos |
+| build_runner | ^2.15.0 | Code generation |
 | very_good_analysis | ^11.0.0 | Reglas estrictas de análisis estático |
-| flutter_lints | ^6.0.0 | Reglas base de lint |
-| mocktail | ^1.0.4 | Mocking para tests |
-| fake_async | ^1.3.3 | Control de tiempos/async en tests |
-| flutter_test | SDK | Testing framework nativo |
 
 ---
 
@@ -243,57 +180,38 @@ class ExpenseController extends _$ExpenseController {
 
 ```
 lib/
-├── main.dart                          # Punto de entrada, inicialización de Supabase
+├── main.dart                          # Punto de entrada, Supabase, deep links, tema
 ├── theme/
-│   ├── theme.dart                     # Definición de tema claro/oscuro
+│   ├── theme.dart                     # Tema claro/oscuro
 │   └── theme_builder.dart             # Builder del tema con Google Fonts
 └── src/
-    ├── constants/                     # Constantes globales de la app
+    ├── constants/                     # Constantes globales
     ├── utils/                         # Utilidades generales
     ├── core/
-    │   ├── config/                    # Configuración de Supabase y entorno
-    │   ├── data/models/               # Modelos de datos (DTOs)
-    │   ├── domain/entities/           # Entidades del dominio (Equatable)
-    │   ├── network/                   # Cliente HTTP y configuración de red
-    │   └── presentation/              # Widgets compartidos (botones, dialogs, etc.)
+    │   ├── config/                    # EnvironmentConfig, LegalConfig
+    │   ├── constants/                 # Constantes de la app
+    │   ├── data/                      # Modelos y sync del widget
+    │   ├── domain/entities/           # Entidades compartidas
+    │   ├── network/                   # Timeout y conectividad
+    │   ├── provider/                  # Providers globales (tema)
+    │   └── presentation/              # Widgets, dialogs, pages y utils compartidos
     ├── navigation/
     │   ├── domain/service/            # Interfaz del servicio de navegación
-    │   ├── data/services/             # Implementación del servicio de navegación
-    │   ├── provider/                  # Providers de navegación (routerProvider)
-    │   └── routes/                    # Definición de rutas GoRouter
+    │   ├── data/services/             # Implementación
+    │   ├── provider/                  # routerProvider, pendingDeepLink
+    │   ├── routes/                    # AppRoute (rutas centralizadas)
+    │   └── presentation/              # MainShell (bottom navbar)
     └── features/
-        ├── auth/                      # Login, registro, sesión
-        │   ├── data/                  # Repository impl, datasources
-        │   ├── domain/                # Entities, repository interface
-        │   └── presentation/          # LoginView, RegisterView, AuthController
-        ├── expenses/                  # CRUD de gastos
-        │   ├── data/
-        │   ├── domain/
-        │   └── presentation/          # ExpensesListView, ExpenseFormView, ExpenseController
-        ├── categories/                # CRUD de categorías
-        │   ├── data/
-        │   ├── domain/
-        │   └── presentation/          # CategoriesListView, CategoryFormView, CategoryController
-        ├── reports/                   # Reportes mensuales
-        │   ├── data/
-        │   ├── domain/
-        │   └── presentation/          # ReportsView, ReportController
-        ├── home/                      # Dashboard principal
-        │   ├── data/
-        │   ├── domain/
-        │   └── presentation/          # HomeView, ExpenseCard, HomeProvider
-        └── profile/                   # Perfil del usuario
-            ├── data/
-            ├── domain/
-            └── presentation/          # ProfileView, ProfileProvider
+        ├── auth/                      # Login, registro, sesión, onboarding
+        ├── categories/                # CRUD de categorías y presupuestos
+        ├── expenses/                  # CRUD de gastos, sync, duplicados, deudas
+        ├── home/                      # Dashboard, checklist, proyección
+        ├── reports/                   # Reporte mensual e insights
+        ├── settings/                  # Preferencias del usuario
+        └── profile/                   # Perfil y ajustes
 ```
 
-### Convenciones de Carpetas
-
-- **`data/`** — Implementación de repositorios, data sources, modelos de red, mappers.
-- **`domain/`** — Contratos (interfaces), entidades de negocio, casos de uso.
-- **`presentation/`** — Widgets, pantallas, controllers/providers Riverpod.
-- Los controllers se definen en la capa de presentación y consumen repositorios del dominio.
+Cada feature con capas completas (`auth`, `categories`, `expenses`, `reports`, `settings`) usa `data/`, `domain/` y `presentation/`; `home` y `profile` son principalmente `presentation/`.
 
 ---
 
@@ -301,35 +219,86 @@ lib/
 
 ### Prerrequisitos
 
-- **Flutter SDK** >= 3.12.2 ([instalación](https://docs.flutter.dev/get-started/install))
-- **Dart SDK** >= 3.12.2
-- **Cuenta en Supabase** ([supabase.com](https://supabase.com))
-- **Android Studio / Xcode** para emuladores
+- **Flutter SDK** 3.47.2 o compatible (Dart `^3.12.2`).
+- **Cuenta en Supabase** ([supabase.com](https://supabase.com)).
+- **Android Studio** o **Xcode** para ejecutar en emulador o dispositivo.
 
-### Paso 1 — Clonar el repositorio
+### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/biyuya.git
+git clone https://github.com/SantiFiebke/biyuya.git
 cd biyuya
 ```
 
-### Paso 2 — Instalar dependencias
+### 2. Instalar dependencias
 
 ```bash
 flutter pub get
 ```
 
-### Paso 3 — Configurar variables de entorno
+### 3. Setup de Supabase
 
-Las credenciales se pasan con `--dart-define` al ejecutar la app (no hay archivo `.env`). Ver [Variables de Entorno](#-variables-de-entorno).
+Biyuya **requiere su propio backend en Supabase**. No hay backend compartido: cada usuario/instalación debe crear **su propio proyecto** de Supabase.
 
-### Paso 4 — Ejecutar code generation
+#### Paso 1 — Crear el proyecto
+
+1. Entrar a [supabase.com](https://supabase.com) y crear una cuenta (o iniciar sesión).
+2. Click en **New project**.
+3. Elegir organización, **nombre**, **contraseña de base de datos** y **región**.
+4. Esperar a que termine el aprovisionamiento.
+
+#### Paso 2 — Instalar el Supabase CLI
 
 ```bash
-dart run build_runner build
+brew install supabase/tap/supabase
+# o con npm:
+npm install -g supabase
 ```
 
-### Paso 5 — Ejecutar la app
+Ver la [documentación oficial del CLI](https://supabase.com/docs/guides/cli).
+
+#### Paso 3 — Vincular el proyecto
+
+```bash
+supabase login
+supabase link --project-ref <TU_PROJECT_REF>
+```
+
+El `<TU_PROJECT_REF>` es el identificador del proyecto y aparece en la URL del panel (`https://supabase.com/dashboard/project/<TU_PROJECT_REF>`).
+
+#### Paso 4 — Aplicar las migraciones
+
+```bash
+supabase db push
+```
+
+Crea las tablas, políticas RLS, RPCs y triggers definidos en `supabase/migrations/`.
+
+#### Paso 5 — Deployar la Edge Function
+
+```bash
+supabase functions deploy delete-account
+```
+
+Necesario para la eliminación de cuenta desde la app.
+
+#### Paso 6 — Obtener las credenciales
+
+En el panel: **Settings → API** → copiar **Project URL** y **anon public key**. Ver [Variables de Entorno](#-variables-de-entorno).
+
+> ⚠️ **Sin estas credenciales la app falla al arrancar**, porque `EnvironmentConfig.validate()` lanza una excepción si falta `SUPABASE_URL` o `SUPABASE_ANON_KEY`.
+
+### 4. Configurar las credenciales
+
+Las credenciales se inyectan con `--dart-define` (no hay archivo `.env`). Ver [Variables de Entorno](#-variables-de-entorno).
+
+### 5. Generar código
+
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
+
+### 6. Ejecutar la app
 
 ```bash
 flutter run \
@@ -341,34 +310,32 @@ flutter run \
 
 ## 🔧 Desarrollo
 
-### Hot Reload
+### Hot reload
 
 ```bash
 flutter run
-# En la consola presiona 'r' para hot reload, 'R' para hot restart
+# 'r' hot reload · 'R' hot restart
 ```
 
-### Code Generation
+### Code generation
 
-Los providers con `@riverpod` requieren regeneración. Ejecutar después de cambios en providers:
+Regenerar tras modificar providers anotados con `@riverpod`:
 
 ```bash
-# Build completo
-dart run build_runner build
-
-# Modo watch (regenera automáticamente al guardar)
+dart run build_runner build --delete-conflicting-outputs
+# o en modo watch:
 dart run build_runner watch
 ```
 
-### Análisis Estático
+### Análisis estático
 
 ```bash
 flutter analyze
 ```
 
-El proyecto usa `very_good_analysis` con reglas estrictas. Verificar que no haya warnings antes de commitear.
+El proyecto usa `very_good_analysis`. No debe haber warnings antes de commitear.
 
-### Formateo de Código
+### Formateo
 
 ```bash
 dart format .
@@ -378,36 +345,30 @@ dart format .
 
 ## 🧪 Pruebas
 
-### Ejecutar todos los tests
+### Ejecutar los tests
 
 ```bash
 flutter test
-
-# Salida compacta (una línea por test)
 flutter test --reporter compact
 ```
 
-### Ejecutar tests con cobertura
+### Cobertura
 
 ```bash
 flutter test --coverage
-# Abrir reporte: genhtml coverage/lcov.info -o coverage/html
+genhtml coverage/lcov.info -o coverage/html   # requiere lcov
 ```
 
-### Estado Actual
+### Estado actual
 
-> ✅ **Suite activa:** 37 archivos de test que pasan **304 tests** con `flutter test`.
->
-> La carpeta `test/` espeja `lib/src/`. Convenciones, mocks con `mocktail` y patrones de `ProviderContainer` / overrides de Riverpod están documentados en **[`test/README.md`](test/README.md)**.
+- **56 archivos** de test, **495 tests** en total.
+- La carpeta `test/` espeja `lib/src/`.
 
 ### Mocking
 
-Se usa `mocktail` para mocks en tests:
+Se usa `mocktail` para mocks y `fake_async` para control de tiempos. Los helpers compartidos (`wrapTest`, `waitForLoad`, factories `makeCategory` / `makeExpense` / `makeReport`) viven en `test/helpers/test_helpers.dart`.
 
-```dart
-class MockSupabaseClient extends Mock implements SupabaseClient {}
-class MockGoTrueClient extends Mock implements GoTrueClient {}
-```
+Convenciones, patrones de `ProviderContainer` y overrides de Riverpod están documentados en **[`test/README.md`](test/README.md)**.
 
 ---
 
@@ -416,22 +377,28 @@ class MockGoTrueClient extends Mock implements GoTrueClient {}
 ### Android (APK)
 
 ```bash
-flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release \
+  --dart-define=SUPABASE_URL=... \
+  --dart-define=SUPABASE_ANON_KEY=...
+# Salida: build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ### Android (App Bundle)
 
 ```bash
-flutter build appbundle --release
-# Output: build/app/outputs/bundle/release/app-release.aab
+flutter build appbundle --release \
+  --dart-define=SUPABASE_URL=... \
+  --dart-define=SUPABASE_ANON_KEY=...
+# Salida: build/app/outputs/bundle/release/app-release.aab
 ```
 
 ### iOS
 
 ```bash
-flutter build ios --release
-# Abrir Xcode para configurar firma y publicar
+flutter build ios --release \
+  --dart-define=SUPABASE_URL=... \
+  --dart-define=SUPABASE_ANON_KEY=...
+# Luego abrir Xcode para configurar la firma.
 ```
 
 ---
@@ -440,30 +407,17 @@ flutter build ios --release
 
 Las variables se inyectan **en tiempo de compilación** con `--dart-define` (`String.fromEnvironment`) y se leen desde `EnvironmentConfig` (`lib/src/core/config/enviroment_config.dart`).
 
-### Definir las variables
-
-Pasar `SUPABASE_URL` y `SUPABASE_ANON_KEY` al ejecutar o compilar:
-
 ```bash
 flutter run \
   --dart-define=SUPABASE_URL=https://TU-Proyecto.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=tu-anon-key-aqui
 ```
 
-> ⚠️ **No se usa `dotenv` ni archivos `.env`.** Al ser `String.fromEnvironment`, los valores quedan embebidos en el binario. Para builds, repetir los `--dart-define`:
+> ⚠️ **No se usa `dotenv` ni archivos `.env`.** Al ser `String.fromEnvironment`, los valores quedan **embebidos en el binario compilado**. Para builds, repetir los `--dart-define` en cada comando.
 
-```bash
-flutter build apk --release \
-  --dart-define=SUPABASE_URL=... \
-  --dart-define=SUPABASE_ANON_KEY=...
-```
-
-### Validación en la App
-
-`EnvironmentConfig.validate()` corre al inicio de `main.dart` y lanza excepción si falta alguna variable:
+`EnvironmentConfig.validate()` corre al inicio de `main.dart` y lanza una excepción si falta alguna variable:
 
 ```dart
-// lib/src/core/config/enviroment_config.dart
 class EnvironmentConfig {
   static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
   static const String supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
@@ -478,19 +432,125 @@ class EnvironmentConfig {
 
 ### Obtener las credenciales
 
-1. Ir a [app.supabase.com](https://app.supabase.com)
-2. Seleccionar el proyecto
-3. Ir a **Settings > API**
-4. Copiar `Project URL` → `SUPABASE_URL`
-5. Copiar `anon public` key → `SUPABASE_ANON_KEY`
+1. Entrar a [app.supabase.com](https://app.supabase.com) y seleccionar el proyecto.
+2. Ir a **Settings → API**.
+3. Copiar **Project URL** → `SUPABASE_URL`.
+4. Copiar la **anon public key** → `SUPABASE_ANON_KEY`.
+
+Para crear el proyecto, vincularlo y aplicar migraciones, ver [Setup de Supabase](#setup-de-supabase).
+
+> ℹ️ **`config.json` (opcional):** archivo de conveniencia local para guardar `SUPABASE_URL` y `SUPABASE_ANON_KEY` durante el desarrollo. Está **gitignoreado** y no es necesario: los valores reales se inyectan con `--dart-define`.
 
 ---
 
 ## 📊 Base de Datos
 
-### Modelo de Datos (Supabase)
+Backend en **Supabase PostgreSQL**. Todas las tablas tienen **Row Level Security (RLS)** habilitado.
 
-El backend utiliza **Supabase PostgreSQL** con las siguientes tablas:
+### `profiles` — Perfiles de usuario
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | uuid (PK) | Referencia a `auth.users` |
+| `name` | text | Nombre |
+| `last_name` | text | Apellido |
+| `household_id` | bigint (FK) | Hogar al que pertenece |
+| `role` | text | `owner` o `member` |
+| `created_at` | timestamptz | Alta |
+| `updated_at` | date | Última actualización |
+| `last_modified_at` | timestamptz | Última modificación |
+
+### `households` — Hogares
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | bigint (PK) | Identificador |
+| `name` | text | Nombre del hogar |
+| `invite_code` | text (unique) | Código de invitación |
+| `created_at` | timestamptz | Alta |
+
+### `expenses` — Gastos
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | bigint (PK) | Identificador |
+| `amount` | numeric(10,2) | Monto (> 0) |
+| `date` | timestamp | Fecha del gasto |
+| `description` | text | Descripción (≤ 200 caracteres) |
+| `household_id` | bigint (FK) | Hogar |
+| `category_id` | bigint (FK) | Categoría |
+| `user_uuid` | uuid (FK) | Usuario que registró el gasto |
+| `client_id` | uuid (unique) | Idempotencia de sincronización offline |
+| `created_at` | timestamptz | Alta |
+| `last_modified_at` | timestamptz | Última modificación |
+
+### `categories` — Categorías
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | bigint (PK) | Identificador |
+| `name` | text | Nombre (1–50 caracteres) |
+| `color` | text | Color hexadecimal |
+| `icon` | text | CodePoint del ícono Material |
+| `household_id` | bigint (FK) | Hogar |
+| `budget_amount` | numeric(10,2) | Presupuesto mensual (opcional, > 0) |
+| `is_expense` | boolean | `false` excluye la categoría de los totales |
+| `created_at` | timestamptz | Alta |
+| `last_modified_at` | timestamptz | Última modificación |
+
+### `user_settings` — Preferencias
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `user_id` | uuid (PK) | Referencia a `auth.users` |
+| `debt_settlement_enabled` | boolean | Liquidación de deudas (default `false`) |
+| `month_projection_enabled` | boolean | Proyección mensual (default `false`) |
+| `debt_settlement_explainer_seen` | boolean | Explicador visto |
+| `month_projection_explainer_seen` | boolean | Explicador visto |
+| `first_steps_dismissed` | boolean | Checklist de primeros pasos descartado |
+| `created_at` / `updated_at` | timestamptz | Auditoría |
+
+### `terms_acceptances` — Aceptación de términos
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | uuid (PK) | Identificador |
+| `user_id` | uuid (FK) | Referencia a `auth.users` |
+| `accepted` | boolean | Aceptado |
+| `accepted_at` | timestamptz | Fecha de aceptación |
+| `terms_version` | text | Versión aceptada |
+
+> Registro inmutable: el usuario solo puede leer su propia fila. La inserción la hace el trigger `handle_new_user` a partir de los metadatos del registro.
+
+### Diagrama de relaciones
+
+```
+┌──────────────┐         ┌──────────────┐
+│   profiles   │         │  households  │
+├──────────────┤         ├──────────────┤
+│ id      (PK) │──┐   ┌──│ id      (PK) │
+│ name         │  │   │  │ name         │
+│ last_name    │  └──►│  │ invite_code  │
+│ household_id │      │  └──────┬───────┘
+│ role         │      │         │
+└──────────────┘      │   ┌─────┴──────┐
+                      │   │            │
+               ┌──────┴──────┐  ┌─────┴────────┐
+               │  expenses   │  │  categories  │
+               ├─────────────┤  ├──────────────┤
+               │ id     (PK) │  │ id     (PK)  │
+               │ amount      │  │ name         │
+               │ date        │  │ color        │
+               │ description │  │ icon         │
+               │ household_id│  │ household_id │
+               │ category_id │─►│ budget_amount│
+               │ user_uuid   │  │ is_expense   │
+               │ client_id   │  └──────────────┘
+               └─────────────┘
+
+  user_settings ──► auth.users
+  terms_acceptances ──► auth.users
+```
 
 ### Migraciones
 
@@ -498,15 +558,20 @@ Los cambios de esquema viven en `supabase/migrations/`:
 
 | Migración | Contenido |
 |---|---|
-| `20260918203245_remote_schema.sql` | Esquema remoto inicial |
+| `20260918203245_remote_schema.sql` | Esquema remoto inicial (RLS incluido) |
 | `20260918211000_add_performance_indexes.sql` | Índices de rendimiento |
 | `20260918212000_add_profiles_household_index.sql` | Índice de `profiles.household_id` |
-| `20260918213000_create_household_rpc.sql` | RPC para crear hogar |
-| `20260918214000_join_household_rpc.sql` | RPC para unirse a un hogar |
+| `20260918213000_create_household_rpc.sql` | RPC `create_household` |
+| `20260918214000_join_household_rpc.sql` | RPC `join_household` |
 | `20260918215000_add_input_constraints.sql` | Constraints de entrada |
-| `20260918216000_household_ownership.sql` | Propiedad del hogar |
+| `20260918216000_household_ownership.sql` | Rol y RPC `leave_household` / `delete_household` |
 | `20260922000000_add_category_budget.sql` | Presupuesto por categoría |
 | `20260923000000_add_expense_client_id.sql` | `client_id` para idempotencia offline |
+| `20260924120000_user_settings.sql` | Tabla `user_settings` |
+| `20260925130000_add_category_is_expense.sql` | Bandera `is_expense` |
+| `20260925140000_user_settings_feature_flags.sql` | Feature flags de preferencias |
+| `20260925150000_user_settings_first_steps.sql` | Flag del checklist de primeros pasos |
+| `20260926120000_terms_acceptances.sql` | Tabla `terms_acceptances` y trigger |
 
 Aplicar al proyecto remoto:
 
@@ -514,122 +579,46 @@ Aplicar al proyecto remoto:
 supabase db push
 ```
 
-> ⚠️ `20260922000000_add_category_budget.sql` y `20260923000000_add_expense_client_id.sql` **deben aplicarse** o la app falla en runtime: el presupuesto por categoría y la idempotencia del modo offline dependen de esas columnas.
-
 ---
 
-#### `profiles` — Perfiles de usuario
+## 📴 Modo Offline
 
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid (PK) | ID del usuario (referencia a auth.users) |
-| `name` | text | Nombre del usuario |
-| `last_name` | text | Apellido del usuario |
-| `household_id` | uuid (FK) | Referencia al hogar al que pertenece |
-
----
-
-#### `households` — Hogares
-
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid (PK) | ID del hogar |
-| `name` | text | Nombre del hogar (ej: "Casa Martínez") |
-| `invite_code` | text (unique) | Código de invitación de 6 caracteres |
-
----
-
-#### `expenses` — Gastos
-
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid (PK) | ID del gasto |
-| `amount` | numeric | Monto del gasto |
-| `date` | date | Fecha del gasto |
-| `description` | text | Descripción breve |
-| `household_id` | uuid (FK) | Hogar al que pertenece el gasto |
-| `category_id` | uuid (FK) | Categoría del gasto |
-| `user_uuid` | uuid (FK) | Usuario que registró el gasto |
-| `created_at` | timestamptz | Fecha de creación (auto) |
-| `last_modified_at` | timestamptz | Última modificación |
-
----
-
-#### `categories` — Categorías
-
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `id` | uuid (PK) | ID de la categoría |
-| `name` | text | Nombre de la categoría |
-| `color` | text | Color hexadecimal (ej: `#FF5722`) |
-| `icon` | text | Nombre del ícono Material |
-| `household_id` | uuid (FK) | Hogar al que pertenece |
-| `created_at` | timestamptz | Fecha de creación (auto) |
-
----
-
-### Diagrama de Relaciones
-
-```
-┌──────────────┐     ┌──────────────┐
-│   profiles   │     │  households  │
-├──────────────┤     ├──────────────┤
-│ id      (PK) │◄────│ id      (PK) │
-│ name         │     │ name         │
-│ last_name    │     │ invite_code  │
-│ household_id │────►│              │
-└──────────────┘     └──────┬───────┘
-                            │
-                     ┌──────┴───────┐
-                     │              │
-              ┌──────┴──────┐ ┌─────┴────────┐
-              │  expenses   │ │  categories  │
-              ├─────────────┤ ├──────────────┤
-              │ id     (PK) │ │ id     (PK)  │
-              │ amount      │ │ name         │
-              │ date        │ │ color        │
-              │ description │ │ icon         │
-              │ household_id│─│ household_id │
-              │ category_id │─│              │
-              │ user_uuid   │ │ created_at   │
-              │ created_at  │ └──────────────┘
-              │ last_modified_at │
-              └─────────────┘
-```
-
----
-
-## 📴 Modo Offline (outbox + sync)
-
-La app permite registrar gastos sin conexión y sincronizarlos luego.
-
-- **Outbox local:** los gastos creados sin red se guardan en `PendingExpenseStore` (`shared_preferences`) y se muestran de forma **optimista** con el badge **"pendiente"**.
-- **Idempotencia:** cada gasto pendiente lleva un `client_id` (uuid v4). Al sincronizar se hace `upsert` con `onConflict: 'client_id'`, así los reintentos no generan filas duplicadas.
-- **Disparadores de sync:** al recuperar conectividad (`connectivity_plus`), al reanudar la app y con el botón manual **"Reintentar sync"**.
-- **`ExpenseSyncService.flush()`** vacía la outbox; tiene guard de **re-entrancy** (si ya hay un flush en curso, no arranca otro).
+- **Outbox local:** los gastos creados sin conexión se guardan en `PendingExpenseStore` (`shared_preferences`) y se muestran de forma optimista con el badge **"pendiente"**.
+- **Idempotencia:** cada gasto pendiente lleva un `client_id` (uuid v4). Al sincronizar se hace `upsert` con `onConflict: 'client_id'`, por lo que los reintentos no generan filas duplicadas.
+- **Disparadores de sincronización:** al recuperar conectividad (`connectivity_plus`), al reanudar la app y con el botón manual **"Reintentar sync"**.
+- **Re-entrancy guard:** `ExpenseSyncService.flush()` no arranca un nuevo flush si ya hay uno en curso.
 - **Arranque offline:** se cachean categorías y perfil para no depender de la red al iniciar.
 - **Timeouts:** las llamadas de red usan `kNetworkTimeout` (5 s) y caen a la caché si no responden.
-- El total del **widget nativo** incluye los gastos pendientes.
 
 ---
 
-## 🔁 Detección de duplicados
+## 🔁 Detección de Duplicados
 
-Detector *content-only* `findDuplicateExpenseIds`: agrupa los gastos por la clave `householdId|amount|día|categoryId|description normalizada` (**sin `user_uuid`**, para detectar duplicados aunque los cargue otro miembro). Los gastos repetidos se marcan con el badge **"posible duplicado"** en la lista y en el home; la marca es informativa y **no bloquea** el registro.
+Detector *content-only* (`findDuplicateExpenseIds`): agrupa los gastos por la clave `householdId | amount | día | categoryId | descripción normalizada`. No incluye `user_uuid`, por lo que detecta duplicados aunque los haya cargado otro miembro del hogar. Los gastos repetidos se marcan con el badge **"posible duplicado"** en la lista y en el home. La marca es informativa y **no bloquea** el registro.
 
 ---
 
-## 📱 Widget nativo
+## 📱 Widget Nativo
 
-- **Android:** `ExpenseWidget` (`AppWidgetProvider`) muestra el total gastado hoy. Se alimenta de `SharedPreferences` y de un `MethodChannel` (`biyuya/widget`).
-- **Refresco:** on-demand desde la app y por `updatePeriodMillis` (24 h). El reset a medianoche es pasivo: al leer, compara la fecha y descarta el total de ayer.
-- **iOS:** **no tiene widget** — no existe extensión WidgetKit en el proyecto.
+- **Android:** `ExpenseWidget` (`AppWidgetProvider`) muestra el total gastado hoy y chips de categorías frecuentes. Se alimenta de `SharedPreferences` y de un `MethodChannel` (`biyuya/widget`).
+- **Refresco:** on-demand desde la app y por `updatePeriodMillis` (30 min). El reset a medianoche es pasivo: al leer, compara la fecha y descarta el total del día anterior.
+- **Configuración por instancia:** cada widget puede mostrar u ocultar categorías y elegir cuántas (1–4).
+- **iOS:** **no tiene widget** — el proyecto no incluye una extensión WidgetKit.
+
+Documentación detallada en [`docs/WIDGET.md`](docs/WIDGET.md).
+
+---
+
+## 🔗 Deep Links
+
+- **Esquema:** `biyuya://expense/new` (con `?categoryId=<id>` opcional para preseleccionar la categoría).
+- **Android:** cableado. `DeepLinkHandlerActivity` está registrada en el `AndroidManifest.xml` y reenvía el `ACTION_VIEW` a la app.
+- **iOS:** **no cableado**. El `Info.plist` no registra ningún `CFBundleURLTypes`/URL scheme, por lo que el deep link no funciona en iOS.
+- **Robustez:** dedupe de 800 ms y un `pendingDeepLinkProvider` que conserva el destino hasta que la sesión se resuelve, para que el deep link sobreviva al login/onboarding en un arranque en frío.
 
 ---
 
 ## 🔄 Flujo de Autenticación
-
-### Diagrama de Flujo
 
 ```
     ┌───────────┐
@@ -654,110 +643,64 @@ Detector *content-only* `findDuplicateExpenseIds`: agrupa los gastos por la clav
     └───────────┘
 ```
 
-### Lógica de Redirect en GoRouter
+### Lógica de redirect en GoRouter
 
-El router evalúa el estado de autenticación en cada navegación:
+`routerProvider` evalúa el `AsyncValue` de `authSessionControllerProvider` en cada navegación:
 
-```dart
-// router.dart — lógica de redirect
-GoRouter(
-  redirect: (context, state) {
-    final session = ref.watch(authSessionControllerProvider);
-    final isOnboarding = state.matchedLocation == '/onboarding';
+- **`loading`** → Splash.
+- **Sin sesión** → Login (o Registro, si ya está en esa pantalla).
+- **Sesión sin hogar** → Onboarding.
+- **Sesión con hogar** → Home; consume el deep link pendiente si existe.
 
-    // Sin sesión → Login
-    if (session == null) return '/login';
-
-    // Sesión pero sin hogar → Onboarding
-    if (session.householdId == null && !isOnboarding) {
-      return '/onboarding';
-    }
-
-    // Sesión + hogar, pero en login/onboarding → Home
-    if (session.householdId != null &&
-        (state.matchedLocation == '/login' ||
-         state.matchedLocation == '/onboarding')) {
-      return '/home';
-    }
-
-    return null; // No redirigir
-  },
-  // ...
-)
-```
-
-### Detalle del Flujo
-
-1. **Splash** — Inicializa Supabase, verifica si hay sesión existente.
-2. **Login** — Email/password vía `supabase_flutter`. Al autenticarse, se crea el stream de auth que actualiza el profile.
-3. **Onboarding** — Si el usuario no tiene `household_id`, debe crear un hogar nuevo o unirse con código de invitación.
-4. **Home** — Dashboard con los últimos 15 gastos, nombre del hogar, y código de invitación para compartir.
-
-### Persistencia de Sesión
+### Persistencia de sesión
 
 - Supabase maneja la persistencia de tokens automáticamente.
-- El `authSessionControllerProvider` (keepAlive) mantiene el estado de sesión durante toda la vida de la app.
-- Se usa un `stream` de auth para detectar cambios (logout desde otro dispositivo, etc.).
+- `authSessionControllerProvider` (keepAlive) mantiene el estado de sesión durante toda la vida de la app y escucha el stream de auth para detectar cambios.
+
+---
+
+## ⚠️ Limitaciones Conocidas
+
+- **iOS:** sin widget nativo y sin deep links cableados (no hay URL scheme registrado en `Info.plist`).
+- **Internacionalización:** la app solo soporta `es-ES`; no hay sistema de i18n multi-idioma.
+- **CI/CD:** no hay pipelines configurados.
+- **Analytics / crash reporting:** no integrados.
 
 ---
 
 ## 🤝 Contribuir
 
-### Flujo de Trabajo
+### Flujo de trabajo
 
 1. Clonar el repositorio.
-2. Crear una rama para la feature/fix:
+2. Crear una rama para la feature o el fix:
    ```bash
    git checkout -b feature/nueva-feature
    ```
 3. Hacer cambios y commitear con mensajes descriptivos.
-4. Push y crear Pull Request.
+4. Push y crear un Pull Request.
 
-### Convenciones de Commits
+### Convenciones de commits
 
 ```
 feat: agregar filtro de fechas en reportes
-fix: corregir redirect cuando household es null
+fix: corregir redirect cuando el hogar es null
 refactor: extraer ExpenseFormWidget
 chore: actualizar dependencias
-docs: agregar README
+docs: actualizar README
 ```
 
 ### Reglas
 
-- Ejecutar `flutter analyze` sin warnings antes de commitear.
-- Ejecutar `dart format .` para mantener consistencia.
+- `flutter analyze` sin warnings antes de commitear.
+- `dart format .` para mantener consistencia.
 - Preferir commits pequeños y descriptivos.
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia **MIT**. Ver el archivo [LICENSE](LICENSE) para más detalles.
-
-```
-MIT License
-
-Copyright (c) 2026
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+Este proyecto está bajo la licencia **[MIT](LICENSE)**.
 
 ---
 
@@ -765,20 +708,12 @@ SOFTWARE.
 
 ### Desarrollador
 
-- **sfiebke** — [GitHub](https://github.com/sfiebke)
-
-### Contribuidores
-
-<!-- Agregar miembros del equipo aquí -->
-
-| Nombre | Rol | GitHub |
-|---|---|---|
-| — | — | — |
+- **sfiebke** — [GitHub](https://github.com/SantiFiebke)
 
 ### Contacto
 
-- **Issues**: [GitHub Issues](https://github.com/sfiebke/biyuya/issues)
-- **Email**: stfiebke@outlook.es
+- **Issues:** [GitHub Issues](https://github.com/SantiFiebke/biyuya/issues)
+- **Email:** stfiebke@outlook.es
 
 ---
 
