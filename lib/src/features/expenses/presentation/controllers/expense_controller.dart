@@ -10,6 +10,7 @@ import 'package:biyuya/src/features/categories/presentation/controllers/category
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/domain/expense_totals.dart';
 import 'package:biyuya/src/features/expenses/domain/services/featured_categories_calculator.dart';
+import 'package:biyuya/src/features/expenses/presentation/controllers/expense_list_controller.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
@@ -175,11 +176,20 @@ class ExpenseController extends _$ExpenseController {
     await _reloadMerge();
   }
 
+  /// Single choke point for derived state: reports + the paginated list view.
+  /// Without invalidating [expenseListControllerProvider] the list view keeps
+  /// its stale items after a mutation (its initial-load guard skips refresh).
+  void _invalidateDerived() {
+    ref
+      ..invalidate(reportControllerProvider)
+      ..invalidate(expenseListControllerProvider);
+  }
+
   /// Flushes the outbox, refreshes state and reports.
   Future<void> retrySync() async {
     await ref.read(expenseSyncServiceProvider).flush();
     await _reloadMerge();
-    ref.invalidate(reportControllerProvider);
+    _invalidateDerived();
   }
 
   Future<bool> createExpense({
@@ -213,6 +223,7 @@ class ExpenseController extends _$ExpenseController {
 
     await ref.read(pendingExpenseStoreProvider).add(pendingExpense);
     _emitExpenses([pendingExpense, ...previous]);
+    _invalidateDerived();
 
     unawaited(_flushAndRemerge());
     return true;
@@ -221,6 +232,7 @@ class ExpenseController extends _$ExpenseController {
   Future<bool> discardPending(String clientId) async {
     await ref.read(pendingExpenseStoreProvider).remove(clientId);
     await _reloadMerge();
+    _invalidateDerived();
     return true;
   }
 
@@ -257,7 +269,7 @@ class ExpenseController extends _$ExpenseController {
         }
         final updatedList = List<Expense>.from(previous);
         _emitExpenses(updatedList);
-        ref.invalidate(reportControllerProvider);
+        _invalidateDerived();
         return true;
       },
       (failure) {
@@ -314,6 +326,7 @@ class ExpenseController extends _$ExpenseController {
         return await discardPending(clientId);
       }
       _emitExpenses(previous.where((e) => e.id != id).toList());
+      _invalidateDerived();
       return true;
     }
 
@@ -325,7 +338,7 @@ class ExpenseController extends _$ExpenseController {
       (_) {
         final remaining = previous.where((e) => e.id != id).toList();
         _emitExpenses(remaining);
-        ref.invalidate(reportControllerProvider);
+        _invalidateDerived();
         return true;
       },
       (failure) {

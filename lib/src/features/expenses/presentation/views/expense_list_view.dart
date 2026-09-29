@@ -623,7 +623,7 @@ class ExpenseListTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ponytail: single ellipsized line; long category may ellipsize the
+            // single ellipsized line; long category may ellipsize the
             // date too, acceptable — full data lives in the detail view.
             Text(
               '${category?.name ?? ''} · ${formatHumanDate(expense.date)}',

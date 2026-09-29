@@ -45,7 +45,7 @@ List<DebtTransfer> settleDebts({
   final monthExpenses = expenses.where(
     (e) => e.date.year == year && e.date.month == month,
   );
-  // ponytail: gastos sin pagador asignado y categorías no-gasto (Ahorro)
+  // Gastos sin pagador asignado y categorías no-gasto (Ahorro)
   // quedan fuera del cálculo de saldos
   final included = monthExpenses
       .where(

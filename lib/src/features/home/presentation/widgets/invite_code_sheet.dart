@@ -10,16 +10,14 @@ class InviteCodeSheet extends StatelessWidget {
   final String inviteCode;
 
   static void show(BuildContext context, {required String inviteCode}) {
-    unawaited(
-      showModalBottomSheet<String>(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        builder: (_) => InviteCodeSheet(inviteCode: inviteCode),
+    showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      clipBehavior: Clip.antiAlias,
+      builder: (_) => InviteCodeSheet(inviteCode: inviteCode),
     );
   }
 
