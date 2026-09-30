@@ -350,7 +350,6 @@ class _DateField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
-      key: ValueKey(formattedDate),
       initialValue: formattedDate,
       readOnly: true,
       decoration: const InputDecoration(

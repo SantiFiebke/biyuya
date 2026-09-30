@@ -209,6 +209,8 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   Future<Result<void, AuthFailure>> leaveHousehold() async {
     try {
       await _client.rpc<void>('leave_household').timeout(kNetworkTimeout);
+      await _profileCache.clear();
+      await _categoryCache.clear();
       return const Success(null);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al salir del hogar: $e'));
@@ -219,6 +221,8 @@ class AuthRepositoryImpl implements AuthRepositoryBase {
   Future<Result<void, AuthFailure>> deleteHousehold() async {
     try {
       await _client.rpc<void>('delete_household').timeout(kNetworkTimeout);
+      await _profileCache.clear();
+      await _categoryCache.clear();
       return const Success(null);
     } on Exception catch (e) {
       return Error(AuthFailure('Error al eliminar el hogar: $e'));

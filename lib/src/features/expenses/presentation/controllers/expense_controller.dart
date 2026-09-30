@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:biyuya/src/core/constants/app_constants.dart';
 import 'package:biyuya/src/core/data/widget_daily_total_sync.dart';
 import 'package:biyuya/src/core/network/connectivity_provider.dart';
-import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
@@ -22,9 +21,18 @@ part 'expense_controller.g.dart';
 @Riverpod(keepAlive: true)
 class ExpenseController extends _$ExpenseController {
   bool _isSubmitting = false;
+  // Invalida respuestas en vuelo: build()/cargas nuevas lo incrementan y una
+  // respuesta de un epoch anterior se descarta (evita escribir data de la
+  // cuenta anterior en `state` tras un rebuild).
+  int _epoch = 0;
 
   @override
   AsyncValue<List<Expense>> build() {
+    // ponytail: reset submit guard — notifier instance survives invalidate,
+    // so a logout mid-submit must not leave _isSubmitting stuck true.
+    _isSubmitting = false;
+    _epoch += 1;
+
     ref.listen(isOnlineProvider, (previous, next) {
       if (next.value == true) {
         unawaited(retrySync());
@@ -57,6 +65,8 @@ class ExpenseController extends _$ExpenseController {
     required int year,
     required int month,
   }) async {
+    _epoch += 1;
+    final epoch = _epoch;
     final session = ref.read(authSessionControllerProvider);
     final householdId = session.value?.householdId;
 
@@ -66,6 +76,9 @@ class ExpenseController extends _$ExpenseController {
     }
 
     final pending = await ref.read(pendingExpenseStoreProvider).load();
+    if (epoch != _epoch) {
+      return;
+    }
 
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
@@ -74,6 +87,9 @@ class ExpenseController extends _$ExpenseController {
       year: year,
       month: month,
     );
+    if (epoch != _epoch) {
+      return;
+    }
     result.when(
       (synced) => _merge(synced, pending),
       (failure) => _emitLoadFailure(failure, pending),
@@ -81,7 +97,7 @@ class ExpenseController extends _$ExpenseController {
   }
 
   String? get _userUuid {
-    return ref.read(supabaseClientProvider).auth.currentUser?.id;
+    return ref.read(authSessionControllerProvider).value?.id;
   }
 
   /// Single exit point: sets expenses state and syncs widget total.
@@ -148,7 +164,12 @@ class ExpenseController extends _$ExpenseController {
   /// Reloads the outbox, refreshes the current-month network list and
   /// re-merges. Keeps the previous state visible instead of flashing loading.
   Future<void> _reloadMerge() async {
+    _epoch += 1;
+    final epoch = _epoch;
     final pending = await ref.read(pendingExpenseStoreProvider).load();
+    if (epoch != _epoch) {
+      return;
+    }
     final session = ref.read(authSessionControllerProvider);
     final householdId = session.value?.householdId;
 
@@ -165,6 +186,9 @@ class ExpenseController extends _$ExpenseController {
           year: now.year,
           month: now.month,
         );
+    if (epoch != _epoch) {
+      return;
+    }
     result.when(
       (synced) => _merge(synced, pending),
       (failure) => _emitLoadFailure(failure, pending),

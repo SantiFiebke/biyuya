@@ -40,6 +40,7 @@ class WidgetDailyTotalSync {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyTotal);
       await prefs.remove(_keyDate);
+      await prefs.remove(_keyFeatured);
       await _refreshWidget();
     } on Exception catch (e) {
       _log.w('Failed to clear widget daily total', error: e);

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockAuthRepository extends Mock implements AuthRepositoryBase {}
 
@@ -19,6 +20,8 @@ void main() {
   late StreamController<UserProfile?> profileController;
 
   setUp(() {
+    // signOut() resets theme + widget totals through SharedPreferences.
+    SharedPreferences.setMockInitialValues({});
     mockRepo = MockAuthRepository();
     authStateController = StreamController<UserProfile?>();
     profileController = StreamController<UserProfile?>();

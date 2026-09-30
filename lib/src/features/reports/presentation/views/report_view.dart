@@ -43,10 +43,7 @@ class ReportView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncReport = ref.watch(reportControllerProvider);
 
-    ref.listen<AsyncValue<MonthlyReport?>>(reportControllerProvider, (
-      _,
-      state,
-    ) {
+    ref.listen<AsyncValue<ReportState>>(reportControllerProvider, (_, state) {
       state.whenOrNull(
         error: (error, _) => context.showErrorSnackBar(error.toString()),
       );
@@ -61,7 +58,8 @@ class ReportView extends ConsumerWidget {
           retryLabel: 'Reintentar',
           onRetry: () => ref.invalidate(reportControllerProvider),
         ),
-        data: (report) {
+        data: (reportState) {
+          final report = reportState.report;
           if (report == null) {
             return EmptyView(
               title: 'Sin datos este mes',
@@ -180,7 +178,7 @@ class MonthNavigator extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final report = ref.watch(reportControllerProvider).value;
+    final selected = ref.watch(reportControllerProvider).value;
     final controller = ref.read(reportControllerProvider.notifier);
 
     return Row(
@@ -191,8 +189,8 @@ class MonthNavigator extends ConsumerWidget {
           onPressed: controller.previousMonth,
         ),
         Text(
-          report != null
-              ? '${_monthNames[report.month - 1]} ${report.year}'
+          selected != null
+              ? '${_monthNames[selected.month - 1]} ${selected.year}'
               : 'Cargando...',
           style: Theme.of(
             context,

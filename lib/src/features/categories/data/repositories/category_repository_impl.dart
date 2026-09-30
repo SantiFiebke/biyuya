@@ -30,6 +30,16 @@ class CategoryRepositoryImpl implements CategoryRepositoryBase {
     } on Exception catch (e) {
       final cached = await _cache.load();
       if (cached != null) {
+        final hasForeignEntries = cached.any(
+          (c) => c.householdId != householdId,
+        );
+        if (hasForeignEntries) {
+          return const Error(
+            CategoryFailure(
+              'Categorías en caché no pertenecen al hogar solicitado.',
+            ),
+          );
+        }
         return Success(cached);
       }
       return Error(CategoryFailure('Error al obtener categorías: $e'));

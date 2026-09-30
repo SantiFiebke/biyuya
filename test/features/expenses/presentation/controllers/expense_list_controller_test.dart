@@ -1,5 +1,4 @@
 import 'package:biyuya/src/core/network/connectivity_provider.dart';
-import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/data/local/pending_expense_store.dart';
@@ -15,17 +14,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../../../../helpers/test_helpers.dart';
 
 class MockExpenseRepository extends Mock implements ExpenseRepositoryImpl {}
-
-class MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
-
-class MockGoTrueClient extends Mock implements supabase.GoTrueClient {}
-
-class MockUser extends Mock implements supabase.User {}
 
 /// In-memory [PendingExpenseStore] — never touches SharedPreferences.
 class FakePendingExpenseStore extends PendingExpenseStore {
@@ -102,9 +94,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MockExpenseRepository repo;
-  late MockSupabaseClient mockSupabaseClient;
-  late MockGoTrueClient mockGoTrueClient;
-  late MockUser mockUser;
   late FakePendingExpenseStore store;
   late List<PageCall> calls;
   late List<Expense> serverItems;
@@ -120,9 +109,6 @@ void main() {
 
   setUp(() {
     repo = MockExpenseRepository();
-    mockSupabaseClient = MockSupabaseClient();
-    mockGoTrueClient = MockGoTrueClient();
-    mockUser = MockUser();
     store = FakePendingExpenseStore();
     calls = [];
     serverItems = [];
@@ -199,11 +185,6 @@ void main() {
       ),
     ).thenAnswer((_) async => const Error(ExpenseFailure('offline')));
 
-    // _userUuid reads the Supabase auth session.
-    when(() => mockSupabaseClient.auth).thenReturn(mockGoTrueClient);
-    when(() => mockGoTrueClient.currentUser).thenReturn(mockUser);
-    when(() => mockUser.id).thenReturn('test-user-id');
-
     // _emitExpenses writes the native widget total via SharedPreferences.
     SharedPreferences.setMockInitialValues({});
 
@@ -222,11 +203,8 @@ void main() {
             makeCategory(id: 2, name: 'Transport'),
           ]),
         ),
-        supabaseClientProvider.overrideWithValue(mockSupabaseClient),
         // Static stream: avoids the reconnect retrySync racing assertions.
-        isOnlineProvider.overrideWith(
-          (ref) => Stream<bool>.value(false),
-        ),
+        isOnlineProvider.overrideWith((ref) => Stream<bool>.value(false)),
       ],
     );
   });
@@ -483,5 +461,58 @@ void main() {
       expect(item.userUuid, 'test-user-id');
       expect(calls, hasLength(2));
     });
+  });
+
+  group('ExpenseListController filter reset on invalidate (TEST-002)', () {
+    // Regression: the notifier instance survives invalidate, so build() must
+    // reset the filter fields. refresh() alone never clears them — if the
+    // build() reset goes away, stale account filters leak into the next
+    // session's query.
+    test(
+      'fresh build() after invalidate queries with default filters',
+      () async {
+        serverItems = List.generate(5, (i) => expense(id: i + 1));
+
+        container.read(expenseListControllerProvider);
+        await settle();
+        expect(calls, hasLength(1));
+        expect(calls.single.categoryId, isNull);
+
+        // Load a filter set into the surviving notifier instance.
+        final notifier = container.read(expenseListControllerProvider.notifier);
+        await notifier.setFilters(
+          categoryId: 7,
+          startDate: DateTime(2025, 7),
+          endDate: DateTime(2025, 7, 31),
+          userUuid: 'other-user',
+        );
+        await settle();
+        expect(calls, hasLength(2));
+        final filtered = calls.last;
+        expect(filtered.categoryId, 7);
+        expect(filtered.userUuid, 'other-user');
+        expect(filtered.startDate, isNotNull);
+        expect(filtered.endDate, isNotNull);
+
+        // Same trigger the signOut/_resetSessionState path uses. No active
+        // listener here, so the rebuild is lazy — read to flush it.
+        container
+          ..invalidate(expenseListControllerProvider)
+          ..read(expenseListControllerProvider);
+        await settle();
+
+        expect(
+          calls,
+          hasLength(3),
+          reason: 'rebuild should refresh page 0 exactly once',
+        );
+        final fresh = calls.last;
+        expect(fresh.categoryId, isNull, reason: 'stale categoryId leaked');
+        expect(fresh.startDate, isNull, reason: 'stale startDate leaked');
+        expect(fresh.endDate, isNull, reason: 'stale endDate leaked');
+        expect(fresh.userUuid, isNull, reason: 'stale userUuid leaked');
+        expect(fresh.offset, 0, reason: 'pagination not reset');
+      },
+    );
   });
 }

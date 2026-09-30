@@ -81,6 +81,22 @@ void main() {
       expect(prefs.getString('widget_daily_date'), isNull);
     });
 
+    test('removes widget_featured_categories too (logout leak fix)', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('widget_daily_total', '100.0');
+      await prefs.setString('widget_daily_date', '2026-01-01');
+      await prefs.setString('widget_featured_categories', '[{"id":1}]');
+
+      await WidgetDailyTotalSync.clearTotal();
+
+      expect(prefs.getString('widget_featured_categories'), isNull);
+      expect(prefs.getString('widget_daily_total'), isNull);
+      expect(prefs.getString('widget_daily_date'), isNull);
+      // Native side still told to refresh so the widget drops the shortcuts.
+      expect(log, hasLength(1));
+      expect(log.first.method, 'refresh');
+    });
+
     test('invokes "refresh" on biyuya/widget exactly once', () async {
       await WidgetDailyTotalSync.clearTotal();
 

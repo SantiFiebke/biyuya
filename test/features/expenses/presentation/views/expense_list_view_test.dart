@@ -78,6 +78,10 @@ Override _emptyMembersOverride() => householdMembersProvider.overrideWithValue(
 ///
 /// Holds the caller's list by reference so a shared fake (delete tests) can
 /// mutate it and `refresh()` re-reads the change.
+///
+/// Mirrors the real contract: filters live in [ExpenseListState] (the view
+/// reads `state.userUuid`/`categoryId`/`startDate` for the chips), so every
+/// emitted state carries them alongside the filtered items.
 class _FakeExpenseListController extends ExpenseListController {
   _FakeExpenseListController(this._source);
 
@@ -109,12 +113,20 @@ class _FakeExpenseListController extends ExpenseListController {
     return true;
   }).toList();
 
+  ExpenseListState _emit() => ExpenseListState(
+    items: _filtered(),
+    categoryId: _categoryId,
+    startDate: _startDate,
+    endDate: _endDate,
+    userUuid: _userUuid,
+  );
+
   @override
-  ExpenseListState build() => ExpenseListState(items: _filtered());
+  ExpenseListState build() => _emit();
 
   @override
   Future<void> refresh() async {
-    state = ExpenseListState(items: _filtered());
+    state = _emit();
   }
 
   @override
@@ -152,7 +164,7 @@ class _FakeExpenseListController extends ExpenseListController {
     } else if (userUuid != null) {
       _userUuid = userUuid;
     }
-    state = ExpenseListState(items: _filtered());
+    state = _emit();
   }
 
   @override

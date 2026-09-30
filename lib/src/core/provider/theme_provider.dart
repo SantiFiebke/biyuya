@@ -27,4 +27,10 @@ class ThemeNotifier extends _$ThemeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_themeKey, state.index);
   }
+
+  Future<void> reset() async {
+    state = ThemeMode.light;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_themeKey);
+  }
 }

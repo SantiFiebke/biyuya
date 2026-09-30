@@ -1,7 +1,7 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/network/connectivity_provider.dart';
-import 'package:biyuya/src/core/network/supabase_client_provider.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
@@ -18,17 +18,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../../../../helpers/test_helpers.dart';
 
 class MockExpenseRepository extends Mock implements ExpenseRepositoryImpl {}
 
-class MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
-
-class MockGoTrueClient extends Mock implements supabase.GoTrueClient {}
-
-class MockUser extends Mock implements supabase.User {}
+/// Session with no signed-in user — `_userUuid` must resolve to null.
+class FakeNullAuthSessionController extends AuthSessionController {
+  @override
+  FutureOr<UserProfile?> build() => null;
+}
 
 /// In-memory [PendingExpenseStore] — never touches SharedPreferences.
 class FakePendingExpenseStore extends PendingExpenseStore {
@@ -93,9 +92,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MockExpenseRepository mockRepo;
-  late MockSupabaseClient mockSupabaseClient;
-  late MockGoTrueClient mockGoTrueClient;
-  late MockUser mockUser;
   late FakePendingExpenseStore store;
   late ProviderContainer container;
 
@@ -119,13 +115,13 @@ void main() {
   ProviderContainer createContainer({
     Stream<bool>? online,
     CategoryController? categoryController,
+    AuthSessionController Function() authSessionController =
+        FakeAuthSessionController.new,
   }) {
     return ProviderContainer(
       overrides: [
         expenseRepositoryProvider.overrideWithValue(mockRepo),
-        authSessionControllerProvider.overrideWith(
-          FakeAuthSessionController.new,
-        ),
+        authSessionControllerProvider.overrideWith(authSessionController),
         // _emitExpenses reads the category controller to resolve featured
         // categories for the widget. Override it so the real Supabase-backed
         // repository is never touched.
@@ -138,7 +134,6 @@ void main() {
               makeCategory(id: 2, name: 'Transport'),
             ]),
           ),
-        supabaseClientProvider.overrideWithValue(mockSupabaseClient),
         pendingExpenseStoreProvider.overrideWithValue(store),
         isOnlineProvider.overrideWith(
           (ref) => online ?? Stream<bool>.value(true),
@@ -151,11 +146,14 @@ void main() {
   void recreateContainer({
     Stream<bool>? online,
     CategoryController? categoryController,
+    AuthSessionController Function() authSessionController =
+        FakeAuthSessionController.new,
   }) {
     container.dispose();
     container = createContainer(
       online: online,
       categoryController: categoryController,
+      authSessionController: authSessionController,
     );
   }
 
@@ -168,9 +166,6 @@ void main() {
 
   setUp(() {
     mockRepo = MockExpenseRepository();
-    mockSupabaseClient = MockSupabaseClient();
-    mockGoTrueClient = MockGoTrueClient();
-    mockUser = MockUser();
     store = FakePendingExpenseStore();
 
     // Default: auto-load returns empty.
@@ -184,11 +179,6 @@ void main() {
 
     // Default: sync flush succeeds with a server expense.
     stubCreateExpense(() async => Success(makeExpense(id: 99)));
-
-    // Mock supabase client for _userUuid.
-    when(() => mockSupabaseClient.auth).thenReturn(mockGoTrueClient);
-    when(() => mockGoTrueClient.currentUser).thenReturn(mockUser);
-    when(() => mockUser.id).thenReturn('test-user-id');
 
     SharedPreferences.setMockInitialValues({});
 
@@ -279,7 +269,9 @@ void main() {
     );
 
     test('createExpense returns false when userUuid missing', () async {
-      when(() => mockGoTrueClient.currentUser).thenReturn(null);
+      recreateContainer(
+        authSessionController: FakeNullAuthSessionController.new,
+      );
 
       container.read(expenseControllerProvider);
       await waitForLoad();

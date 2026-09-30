@@ -16,6 +16,11 @@ class ExpenseListState extends Equatable {
     this.hasMore = false,
     this.isLoadingMore = false,
     this.error,
+    this.categoryId,
+    this.startDate,
+    this.endDate,
+    this.userUuid,
+    this.offset = 0,
   });
 
   /// Gastos cargados: pendientes del outbox primero, luego las páginas.
@@ -30,24 +35,62 @@ class ExpenseListState extends Equatable {
   /// Último fallo de carga; null cuando no hay error.
   final Object? error;
 
+  /// Filtro server-side: categoría (null = sin filtro).
+  final int? categoryId;
+
+  /// Filtro server-side: inicio del rango de fechas (null = sin filtro).
+  final DateTime? startDate;
+
+  /// Filtro server-side: fin del rango de fechas, inclusivo (null = sin filtro).
+  final DateTime? endDate;
+
+  /// Filtro server-side: uuid del miembro (null = sin filtro).
+  final String? userUuid;
+
+  /// Offset de la siguiente página a pedir al servidor.
+  final int offset;
+
   ExpenseListState copyWith({
     List<Expense>? items,
     bool? hasMore,
     bool? isLoadingMore,
     Object? error,
     bool clearError = false,
+    int? categoryId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? userUuid,
+    int? offset,
+    bool clearCategory = false,
+    bool clearDates = false,
+    bool clearUser = false,
   }) {
     return ExpenseListState(
       items: items ?? this.items,
       hasMore: hasMore ?? this.hasMore,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-      // `clearError` gana sobre `error`: así se puede borrar el fallo.
+      // `clear*` gana sobre el valor: así se puede quitar un filtro.
       error: clearError ? null : (error ?? this.error),
+      categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
+      startDate: clearDates ? null : (startDate ?? this.startDate),
+      endDate: clearDates ? null : (endDate ?? this.endDate),
+      userUuid: clearUser ? null : (userUuid ?? this.userUuid),
+      offset: offset ?? this.offset,
     );
   }
 
   @override
-  List<Object?> get props => [items, hasMore, isLoadingMore, error];
+  List<Object?> get props => [
+    items,
+    hasMore,
+    isLoadingMore,
+    error,
+    categoryId,
+    startDate,
+    endDate,
+    userUuid,
+    offset,
+  ];
 }
 
 /// Lista de gastos con paginación server-side.
@@ -61,21 +104,18 @@ class ExpenseListController extends _$ExpenseListController {
   /// Filas por página (server-side).
   static const pageSize = 30;
 
-  int _offset = 0;
-  bool _hasMore = false;
   bool _loading = false;
   // Invalida respuestas en vuelo: refresh()/setFilters() lo incrementan y una
   // respuesta de un epoch anterior se descarta (evita anexar páginas viejas a
   // una lista ya reiniciada).
   int _epoch = 0;
 
-  int? _categoryId;
-  DateTime? _startDate;
-  DateTime? _endDate;
-  String? _userUuid;
-
   @override
   ExpenseListState build() {
+    // Estado nuevo en cada build: invalidate resetea filtros y paginación.
+    // Solo `_loading` vive fuera del estado (guard de carga en vuelo).
+    _loading = false;
+
     // Sesión que llega después del arranque en frío (o cambio de household):
     // recién ahí hay householdId con el cual cargar.
     ref.listen(authSessionControllerProvider, (previous, next) {
@@ -93,13 +133,12 @@ class ExpenseListController extends _$ExpenseListController {
   Future<void> refresh() async {
     _epoch += 1;
     final epoch = _epoch;
-    _offset = 0;
-    _hasMore = false;
+    state = state.copyWith(offset: 0, hasMore: false, isLoadingMore: false);
 
     final householdId = _householdId();
     if (householdId == null) {
       _loading = false;
-      state = const ExpenseListState();
+      state = state.copyWith(items: const <Expense>[], clearError: true);
       return;
     }
 
@@ -117,10 +156,10 @@ class ExpenseListController extends _$ExpenseListController {
           householdId: householdId,
           limit: pageSize,
           offset: 0,
-          categoryId: _categoryId,
-          startDate: _startDate,
-          endDate: _endDate,
-          userUuid: _userUuid,
+          categoryId: state.categoryId,
+          startDate: state.startDate,
+          endDate: state.endDate,
+          userUuid: state.userUuid,
         );
     if (epoch != _epoch) {
       return;
@@ -129,11 +168,12 @@ class ExpenseListController extends _$ExpenseListController {
 
     result.when(
       (page) {
-        _hasMore = page.length == pageSize;
-        _offset = page.length;
-        state = ExpenseListState(
+        state = state.copyWith(
           items: _mergePending(pending, page),
-          hasMore: _hasMore,
+          hasMore: page.length == pageSize,
+          offset: page.length,
+          isLoadingMore: false,
+          clearError: true,
         );
       },
       (failure) {
@@ -145,7 +185,7 @@ class ExpenseListController extends _$ExpenseListController {
   /// Carga la siguiente página y la anexa al final.
   /// No-op si hay una carga en vuelo o no quedan páginas.
   Future<void> loadMore() async {
-    if (_loading || !_hasMore) {
+    if (_loading || !state.hasMore) {
       return;
     }
     final epoch = _epoch;
@@ -164,11 +204,11 @@ class ExpenseListController extends _$ExpenseListController {
         .getExpensesPage(
           householdId: householdId,
           limit: pageSize,
-          offset: _offset,
-          categoryId: _categoryId,
-          startDate: _startDate,
-          endDate: _endDate,
-          userUuid: _userUuid,
+          offset: state.offset,
+          categoryId: state.categoryId,
+          startDate: state.startDate,
+          endDate: state.endDate,
+          userUuid: state.userUuid,
         );
     if (epoch != _epoch) {
       // refresh()/setFilters() reiniciaron la lista: esta página ya no aplica.
@@ -178,11 +218,11 @@ class ExpenseListController extends _$ExpenseListController {
 
     result.when(
       (page) {
-        _hasMore = page.length == pageSize;
-        _offset += page.length;
-        state = ExpenseListState(
+        state = state.copyWith(
           items: [...state.items, ...page],
-          hasMore: _hasMore,
+          hasMore: page.length == pageSize,
+          offset: state.offset + page.length,
+          isLoadingMore: false,
         );
       },
       (failure) {
@@ -210,26 +250,15 @@ class ExpenseListController extends _$ExpenseListController {
     bool clearDates = false,
     bool clearUser = false,
   }) async {
-    if (clearCategory) {
-      _categoryId = null;
-    } else if (categoryId != null) {
-      _categoryId = categoryId;
-    }
-
-    if (clearDates) {
-      _startDate = null;
-      _endDate = null;
-    } else {
-      _startDate = startDate ?? _startDate;
-      _endDate = endDate ?? _endDate;
-    }
-
-    if (clearUser) {
-      _userUuid = null;
-    } else if (userUuid != null) {
-      _userUuid = userUuid;
-    }
-
+    state = state.copyWith(
+      categoryId: categoryId,
+      startDate: startDate,
+      endDate: endDate,
+      userUuid: userUuid,
+      clearCategory: clearCategory,
+      clearDates: clearDates,
+      clearUser: clearUser,
+    );
     await refresh();
   }
 

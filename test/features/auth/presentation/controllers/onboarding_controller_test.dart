@@ -127,10 +127,10 @@ void main() {
 
         // State should be AsyncData(null) after success
         final state = container.read(onboardingControllerProvider);
-        expect(state, isA<AsyncData<void>>());
+        expect(state, isA<AsyncData<Household?>>());
 
-        // Household stored on notifier
-        expect(notifier.createdHousehold?.name, 'Casa');
+        // Household stored in state
+        expect(state.value?.name, 'Casa');
 
         // Repo called exactly once with correct name
         expect(fake.calls.length, 1);
@@ -148,10 +148,10 @@ void main() {
       await notifier.createNewHousehold('Casa');
 
       final state = container.read(onboardingControllerProvider);
-      expect(state, isA<AsyncError<void>>());
+      expect(state, isA<AsyncError<Household?>>());
 
       // No household stored
-      expect(notifier.createdHousehold, isNull);
+      expect(state.value, isNull);
     });
   });
 
@@ -174,7 +174,7 @@ void main() {
         await notifier.joinExistingHousehold('ABC123');
 
         final state = container.read(onboardingControllerProvider);
-        expect(state, isA<AsyncData<void>>());
+        expect(state, isA<AsyncData<Household?>>());
 
         expect(fake.calls, contains('joinHousehold'));
         expect(fake.lastInviteCode, 'ABC123');
@@ -195,7 +195,7 @@ void main() {
         await notifier.joinExistingHousehold('BAD');
 
         final state = container.read(onboardingControllerProvider);
-        expect(state, isA<AsyncError<void>>());
+        expect(state, isA<AsyncError<Household?>>());
       },
     );
   });

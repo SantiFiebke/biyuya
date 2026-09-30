@@ -103,7 +103,9 @@ void main() {
   group('ReportController', () {
     test('build returns null data initially', () {
       final state = container.read(reportControllerProvider);
-      expect(state.value, isNull);
+      // Build seeds a ReportState for the current month; report data loads
+      // asynchronously and is still null at this point.
+      expect(state.value!.report, isNull);
     });
 
     test('build auto-loads report via microtask', () async {
@@ -112,7 +114,7 @@ void main() {
 
       final state = container.read(reportControllerProvider);
       expect(state.value, isNotNull);
-      expect(state.value!.total, 1000);
+      expect(state.value!.report!.total, 1000);
     });
 
     test('build sets AsyncError on load failure', () async {
@@ -135,7 +137,10 @@ void main() {
       await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
-      expect(notifier.selectedMonth, currentMonth);
+      expect(
+        container.read(reportControllerProvider).value!.month,
+        currentMonth,
+      );
 
       final expectedMonth = currentMonth == 1 ? 12 : currentMonth - 1;
       final expectedYear = currentMonth == 1 ? currentYear - 1 : currentYear;
@@ -152,8 +157,14 @@ void main() {
       );
 
       await notifier.previousMonth();
-      expect(notifier.selectedMonth, expectedMonth);
-      expect(notifier.selectedYear, expectedYear);
+      expect(
+        container.read(reportControllerProvider).value!.month,
+        expectedMonth,
+      );
+      expect(
+        container.read(reportControllerProvider).value!.year,
+        expectedYear,
+      );
     });
 
     test('previousMonth wraps from January to December', () async {
@@ -162,20 +173,14 @@ void main() {
 
       final notifier = container.read(reportControllerProvider.notifier);
 
-      // Set to January of current year
-      when(
-        () => mockRepo.getMonthlyReport(
-          householdId: 1,
-          year: currentYear,
-          month: 1,
-        ),
-      ).thenAnswer(
-        (_) async => Success(makeReport(month: 1, year: currentYear)),
-      );
-
-      await notifier.loadReportForMonth(year: currentYear, month: 1);
-      expect(notifier.selectedMonth, 1);
-      expect(notifier.selectedYear, currentYear);
+      // Walk back to January with the supported API (loadReportForMonth was
+      // removed; previousMonth from the build-seeded current month reaches
+      // January without crossing a year boundary).
+      while (container.read(reportControllerProvider).value!.month != 1) {
+        await notifier.previousMonth();
+      }
+      expect(container.read(reportControllerProvider).value!.month, 1);
+      expect(container.read(reportControllerProvider).value!.year, currentYear);
 
       // Now go previous → should wrap to December of previous year
       when(
@@ -189,8 +194,11 @@ void main() {
       );
 
       await notifier.previousMonth();
-      expect(notifier.selectedMonth, 12);
-      expect(notifier.selectedYear, currentYear - 1);
+      expect(container.read(reportControllerProvider).value!.month, 12);
+      expect(
+        container.read(reportControllerProvider).value!.year,
+        currentYear - 1,
+      );
     });
 
     test('nextMonth increments month correctly', () async {
@@ -213,8 +221,13 @@ void main() {
         (_) async => Success(makeReport(month: targetMonth, year: targetYear)),
       );
 
-      await notifier.loadReportForMonth(year: targetYear, month: targetMonth);
-      expect(notifier.selectedMonth, targetMonth);
+      // previousMonth from the build-seeded current month lands exactly on
+      // the target (including the January → December wrap).
+      await notifier.previousMonth();
+      expect(
+        container.read(reportControllerProvider).value!.month,
+        targetMonth,
+      );
 
       // Next should go to current month
       when(
@@ -229,7 +242,10 @@ void main() {
       );
 
       await notifier.nextMonth();
-      expect(notifier.selectedMonth, currentMonth);
+      expect(
+        container.read(reportControllerProvider).value!.month,
+        currentMonth,
+      );
     });
 
     test('nextMonth does not go beyond current month', () async {
@@ -239,10 +255,16 @@ void main() {
       final notifier = container.read(reportControllerProvider.notifier);
 
       // Already at current month (default)
-      expect(notifier.selectedMonth, currentMonth);
+      expect(
+        container.read(reportControllerProvider).value!.month,
+        currentMonth,
+      );
 
       await notifier.nextMonth();
-      expect(notifier.selectedMonth, currentMonth);
+      expect(
+        container.read(reportControllerProvider).value!.month,
+        currentMonth,
+      );
     });
 
     test('canGoNext returns false when at current month', () async {
@@ -254,36 +276,14 @@ void main() {
     });
 
     test('canGoNext returns true when not at current month', () async {
-      when(
-        () => mockRepo.getMonthlyReport(householdId: 1, year: 2024, month: 1),
-      ).thenAnswer((_) async => Success(makeReport(month: 1, year: 2024)));
-
       container.read(reportControllerProvider);
       await waitForLoad();
 
       final notifier = container.read(reportControllerProvider.notifier);
-      await notifier.loadReportForMonth(year: 2024, month: 1);
+      // One step back from the build-seeded current month → not current.
+      await notifier.previousMonth();
 
       expect(notifier.canGoNext, isTrue);
-    });
-
-    test('loadReportForMonth updates selectedYear and selectedMonth', () async {
-      when(
-        () => mockRepo.getMonthlyReport(householdId: 1, year: 2024, month: 3),
-      ).thenAnswer((_) async => Success(makeReport(month: 3, year: 2024)));
-
-      container.read(reportControllerProvider);
-      await waitForLoad();
-
-      final notifier = container.read(reportControllerProvider.notifier);
-      await notifier.loadReportForMonth(year: 2024, month: 3);
-
-      expect(notifier.selectedYear, 2024);
-      expect(notifier.selectedMonth, 3);
-
-      final state = container.read(reportControllerProvider);
-      expect(state.value!.month, 3);
-      expect(state.value!.year, 2024);
     });
   });
 
@@ -325,7 +325,7 @@ void main() {
       await waitForLoad();
 
       final state = budgetContainer.read(reportControllerProvider);
-      final breakdown = state.value!.categoryBreakdowns.single;
+      final breakdown = state.value!.report!.categoryBreakdowns.single;
       expect(breakdown.categoryId, 1);
       expect(breakdown.budgetAmount, 300);
     });
@@ -339,7 +339,7 @@ void main() {
       await waitForLoad();
 
       final state = budgetContainer.read(reportControllerProvider);
-      final breakdown = state.value!.categoryBreakdowns.single;
+      final breakdown = state.value!.report!.categoryBreakdowns.single;
       expect(breakdown.categoryId, 1);
       expect(breakdown.budgetAmount, isNull);
     });

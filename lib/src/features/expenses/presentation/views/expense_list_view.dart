@@ -43,10 +43,6 @@ class ExpenseListView extends ConsumerStatefulWidget {
 class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
   final ScrollController _scrollController = ScrollController();
 
-  int? _selectedCategoryId;
-  DateTimeRange? _dateRange;
-  String? _selectedUserUuid;
-
   /// El controller auto-refresca al construirse y no expone flag de loading,
   /// así que el view re-emite refresh() (en un microtask posterior al del
   /// controller) y lo espera para saber cuándo llegó la primera página.
@@ -54,11 +50,6 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
   /// sin request extra, solo una segunda lectura del outbox.
   bool _initialLoadStarted = false;
   bool _initialLoadDone = false;
-
-  bool get _hasActiveFilters =>
-      _selectedCategoryId != null ||
-      _dateRange != null ||
-      _selectedUserUuid != null;
 
   @override
   void initState() {
@@ -117,19 +108,13 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
   }
 
   void _clearFilters() {
-    setState(() {
-      _selectedCategoryId = null;
-      _dateRange = null;
-      _selectedUserUuid = null;
-    });
     unawaited(ref.read(expenseListControllerProvider.notifier).clearFilters());
   }
 
   void _onCategorySelected(int? id) {
-    if (id == _selectedCategoryId) {
+    if (id == ref.read(expenseListControllerProvider).categoryId) {
       return;
     }
-    setState(() => _selectedCategoryId = id);
     final notifier = ref.read(expenseListControllerProvider.notifier);
     if (id == null) {
       unawaited(notifier.setFilters(clearCategory: true));
@@ -142,7 +127,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     await showCategoryFilterSheet(
       context,
       ref,
-      selectedCategoryId: _selectedCategoryId,
+      selectedCategoryId: ref.read(expenseListControllerProvider).categoryId,
       onSelected: _onCategorySelected,
     );
   }
@@ -156,7 +141,6 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     if (picked == null) {
       return;
     }
-    setState(() => _dateRange = picked);
     // `lte` es inclusivo: cerrar el rango al final del día elegido, igual que
     // el filtro in-memory viejo (`isBefore(end + 1 día)`).
     final endDate = DateTime(
@@ -178,15 +162,15 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     BuildContext context,
     List<UserProfile> members,
   ) async {
+    final currentUuid = ref.read(expenseListControllerProvider).userUuid;
     final result = await showMemberFilterSheet(
       context,
       members: members,
-      selectedUuid: _selectedUserUuid,
+      selectedUuid: currentUuid,
     );
-    if (result == _selectedUserUuid) {
+    if (result == currentUuid) {
       return;
     }
-    setState(() => _selectedUserUuid = result);
     final notifier = ref.read(expenseListControllerProvider.notifier);
     if (result == null) {
       unawaited(notifier.setFilters(clearUser: true));
@@ -230,15 +214,15 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     // Safety reset: orphaned user filter
     ref.listen<AsyncValue<List<UserProfile>>>(householdMembersProvider, (
       _,
-      state,
+      membersState,
     ) {
-      final currentMembers = state.value ?? [];
+      final currentMembers = membersState.value ?? [];
+      final selectedUuid = ref.read(expenseListControllerProvider).userUuid;
       final selectedExists =
-          _selectedUserUuid != null &&
-          currentMembers.any((m) => m.id == _selectedUserUuid);
-      if (_selectedUserUuid != null &&
+          selectedUuid != null &&
+          currentMembers.any((m) => m.id == selectedUuid);
+      if (selectedUuid != null &&
           (!selectedExists || currentMembers.length <= 1)) {
-        setState(() => _selectedUserUuid = null);
         unawaited(
           ref
               .read(expenseListControllerProvider.notifier)
@@ -254,6 +238,10 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
     final hasPendingSync = listState.items.any(
       (e) => e.syncStatus != ExpenseSyncStatus.synced,
     );
+    final hasActiveFilters =
+        listState.categoryId != null ||
+        listState.startDate != null ||
+        listState.userUuid != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -271,12 +259,12 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
         children: [
           // 1. Filter bar (chips espejo de los filtros server-side)
           FilterBar(
-            selectedCategoryId: _selectedCategoryId,
-            dateRange: _dateRange,
-            selectedUserUuid: _selectedUserUuid,
+            selectedCategoryId: listState.categoryId,
+            hasDateFilter: listState.startDate != null,
+            selectedUserUuid: listState.userUuid,
             showMemberChip: showMemberChip,
             members: members,
-            hasActiveFilters: _hasActiveFilters,
+            hasActiveFilters: hasActiveFilters,
             onCategoryTap: () => _showCategoryFilter(context),
             onDateTap: _showDateRangePicker,
             onMemberTap: () => _showMemberFilter(context, members),
@@ -380,7 +368,7 @@ class _ExpenseListViewState extends ConsumerState<ExpenseListView> {
 class FilterBar extends StatelessWidget {
   const FilterBar({
     required this.selectedCategoryId,
-    required this.dateRange,
+    required this.hasDateFilter,
     required this.selectedUserUuid,
     required this.showMemberChip,
     required this.members,
@@ -393,7 +381,7 @@ class FilterBar extends StatelessWidget {
   });
 
   final int? selectedCategoryId;
-  final DateTimeRange? dateRange;
+  final bool hasDateFilter;
   final String? selectedUserUuid;
   final bool showMemberChip;
   final List<UserProfile> members;
@@ -428,7 +416,7 @@ class FilterBar extends StatelessWidget {
           _FilterChipItem(
             label: 'Fecha',
             icon: Icons.date_range_outlined,
-            selected: dateRange != null,
+            selected: hasDateFilter,
             onTap: () async {
               await HapticFeedback.selectionClick();
               onDateTap();

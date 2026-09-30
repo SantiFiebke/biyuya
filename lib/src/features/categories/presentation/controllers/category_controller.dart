@@ -11,13 +11,21 @@ part 'category_controller.g.dart';
 
 @Riverpod(keepAlive: true)
 class CategoryController extends _$CategoryController {
+  // Invalida respuestas en vuelo: build()/cargas nuevas lo incrementan y una
+  // respuesta de un epoch anterior se descarta (evita data de la cuenta
+  // anterior en `state` tras un rebuild).
+  int _epoch = 0;
+
   @override
   AsyncValue<List<Category>> build() {
+    _epoch += 1;
     unawaited(Future.microtask(_loadCategories));
     return const AsyncData([]);
   }
 
   Future<void> _loadCategories() async {
+    _epoch += 1;
+    final epoch = _epoch;
     final session = ref.read(authSessionControllerProvider);
     final householdId = session.value?.householdId;
 
@@ -31,6 +39,9 @@ class CategoryController extends _$CategoryController {
     final result = await repository.getCategories(
       householdId: int.parse(householdId),
     );
+    if (epoch != _epoch) {
+      return;
+    }
     result.when((categories) {
       state = AsyncData(categories);
     }, (failure) => state = AsyncError(failure, StackTrace.current));

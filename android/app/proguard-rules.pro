@@ -29,3 +29,9 @@
 # GeneratedPluginRegistrant). Registered by name and reached through platform
 # channels / intent callbacks, so keep name and members.
 -keep class com.llfbandit.app_links.** { *; }
+
+# --- R8: classes absent from classpath, referenced only from unused paths ---
+# Flutter embedding optional deferred-components (Play Core split install) — app uses FlutterApplication, no deferred components.
+-dontwarn com.google.android.play.core.**
+# Transitive compile-time-only Error Prone annotations (crypto/tink chain).
+-dontwarn com.google.errorprone.annotations.**

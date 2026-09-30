@@ -55,7 +55,7 @@ class _OnboardingViewState extends ConsumerState<OnboardingView> {
     final onboardingState = ref.watch(onboardingControllerProvider);
     final isLoading = onboardingState.isLoading;
 
-    ref.listen<AsyncValue<void>>(onboardingControllerProvider, (_, state) {
+    ref.listen(onboardingControllerProvider, (_, state) {
       state.whenOrNull(
         error: (error, _) {
           context.showErrorSnackBar(error.toString());

@@ -8,12 +8,8 @@ part 'onboarding_controller.g.dart';
 
 @riverpod
 class OnboardingController extends _$OnboardingController {
-  Household? _createdHousehold;
-
-  Household? get createdHousehold => _createdHousehold;
-
   @override
-  AsyncValue<void> build() {
+  AsyncValue<Household?> build() {
     return const AsyncData(null);
   }
 
@@ -26,11 +22,10 @@ class OnboardingController extends _$OnboardingController {
 
     result.when(
       (household) {
-        _createdHousehold = household;
         ref
           ..invalidate(categoryControllerProvider)
           ..invalidate(householdNameProvider);
-        state = const AsyncData(null);
+        state = AsyncData(household);
       },
       (failure) {
         state = AsyncError(failure as Object, StackTrace.current);

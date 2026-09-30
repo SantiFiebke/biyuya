@@ -1,3 +1,4 @@
+import 'package:biyuya/src/features/auth/domain/entities/household.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/onboarding_controller.dart';
 import 'package:biyuya/src/features/auth/presentation/views/onboarding_view.dart';
@@ -13,7 +14,7 @@ import '../../../../helpers/test_helpers.dart';
 
 class _NoopOnboardingController extends OnboardingController {
   @override
-  AsyncValue<void> build() => const AsyncData(null);
+  AsyncValue<Household?> build() => const AsyncData(null);
 
   @override
   Future<void> createNewHousehold(String name) async {}
