@@ -53,4 +53,7 @@ flutter:
     - images/logo_no_background.png
     - images/confused_error_image.jpeg
     - images/empty_image.jpeg
+    - images/empty_image_no_background.png
+    - images/confused_error_image_no_background.png
+
 

@@ -24,7 +24,7 @@ class EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset('images/empty_image.jpeg', height: 180),
+            Image.asset('images/empty_image_no_background.png', height: 180),
             const SizedBox(height: 16),
             Text(
               title,
