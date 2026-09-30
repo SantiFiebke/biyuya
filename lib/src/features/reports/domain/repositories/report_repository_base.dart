@@ -1,3 +1,4 @@
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:equatable/equatable.dart';
 import 'package:multiple_result/multiple_result.dart';
@@ -19,5 +20,6 @@ abstract class ReportRepositoryBase {
     required int householdId,
     required int year,
     required int month,
+    required List<Category> categories,
   });
 }

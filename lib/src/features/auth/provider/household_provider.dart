@@ -10,10 +10,12 @@ part 'household_provider.g.dart';
 class HouseholdName extends _$HouseholdName {
   @override
   Future<HouseholdData?> build() async {
-    final session = ref.watch(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
+    final householdId = ref
+        .watch(authSessionControllerProvider)
+        .value
+        ?.householdIdValue;
 
-    if (householdId == null || householdId.isEmpty) {
+    if (householdId == null) {
       return null;
     }
 
@@ -22,7 +24,7 @@ class HouseholdName extends _$HouseholdName {
       final data = await client
           .from('households')
           .select('name, invite_code')
-          .eq('id', int.parse(householdId))
+          .eq('id', householdId)
           .single()
           .timeout(kNetworkTimeout);
 
@@ -36,10 +38,12 @@ class HouseholdName extends _$HouseholdName {
   }
 
   Future<void> updateName(String newName) async {
-    final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
+    final householdId = ref
+        .read(authSessionControllerProvider)
+        .value
+        ?.householdIdValue;
 
-    if (householdId == null || householdId.isEmpty) {
+    if (householdId == null) {
       return;
     }
 
@@ -47,7 +51,7 @@ class HouseholdName extends _$HouseholdName {
     await client
         .from('households')
         .update({'name': newName})
-        .eq('id', int.parse(householdId))
+        .eq('id', householdId)
         .timeout(kNetworkTimeout);
 
     ref.invalidateSelf();

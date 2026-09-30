@@ -16,6 +16,10 @@ class UserProfile extends Equatable {
   final String role;
 
   bool get hasHousehold => householdId != null && householdId!.isNotEmpty;
+
+  /// [householdId] como entero, o `null` si no hay hogar o el id es inválido.
+  int? get householdIdValue => hasHousehold ? int.tryParse(householdId!) : null;
+
   bool get isOwner => role == 'owner';
 
   @override

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/provider/categories_provider.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
@@ -86,6 +88,7 @@ void main() {
         householdId: any(named: 'householdId'),
         year: any(named: 'year'),
         month: any(named: 'month'),
+        categories: any(named: 'categories'),
       ),
     ).thenAnswer((_) async => const Success(_testReport));
   });
@@ -93,6 +96,9 @@ void main() {
   List<Override> defaultOverrides() => [
     reportRepositoryProvider.overrideWithValue(mockRepo),
     authSessionControllerProvider.overrideWith(FakeAuthSessionController.new),
+    // ReportController resolves categories via categoriesProvider; stub it so
+    // the real Supabase-backed repository is never touched.
+    categoriesProvider.overrideWith((ref) async => const <Category>[]),
   ];
 
   Future<void> pumpReport(WidgetTester tester) async {
@@ -114,6 +120,7 @@ void main() {
         householdId: any(named: 'householdId'),
         year: any(named: 'year'),
         month: any(named: 'month'),
+        categories: any(named: 'categories'),
       ),
     ).thenAnswer((_) async => Success(report));
   }
@@ -171,6 +178,7 @@ void main() {
           householdId: any(named: 'householdId'),
           year: any(named: 'year'),
           month: any(named: 'month'),
+          categories: any(named: 'categories'),
         ),
       ).thenAnswer((_) => completer.future);
 
@@ -182,6 +190,7 @@ void main() {
             authSessionControllerProvider.overrideWith(
               FakeAuthSessionController.new,
             ),
+            categoriesProvider.overrideWith((ref) async => const <Category>[]),
           ],
         ),
       );
@@ -211,6 +220,7 @@ void main() {
           householdId: any(named: 'householdId'),
           year: any(named: 'year'),
           month: any(named: 'month'),
+          categories: any(named: 'categories'),
         ),
       ).thenAnswer((_) async => const Error(ReportFailure('fail')));
 
@@ -236,6 +246,7 @@ void main() {
             authSessionControllerProvider.overrideWith(
               _NoHouseholdAuthSession.new,
             ),
+            categoriesProvider.overrideWith((ref) async => const <Category>[]),
           ],
         ),
       );

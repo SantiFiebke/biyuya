@@ -7,11 +7,14 @@ import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/data/local/pending_expense_store.dart';
 import 'package:biyuya/src/features/expenses/data/repositories/expense_repository_impl.dart';
+import 'package:biyuya/src/features/expenses/data/sync/expense_sync_service.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/domain/repositories/expense_repository_base.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
+import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
+import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +30,20 @@ class MockExpenseRepository extends Mock implements ExpenseRepositoryImpl {}
 class FakeNullAuthSessionController extends AuthSessionController {
   @override
   FutureOr<UserProfile?> build() => null;
+}
+
+/// [ExpenseSyncService] that appends `'flush'` to a shared log before running
+/// the real flush, so a test can assert flush-vs-report call ORDER.
+class OrderRecordingSyncService extends ExpenseSyncService {
+  OrderRecordingSyncService(super._repository, super._store, this.log);
+
+  final List<String> log;
+
+  @override
+  Future<SyncSummary> flush() {
+    log.add('flush');
+    return super.flush();
+  }
 }
 
 /// In-memory [PendingExpenseStore] — never touches SharedPreferences.
@@ -95,6 +112,11 @@ void main() {
   late FakePendingExpenseStore store;
   late ProviderContainer container;
 
+  /// Shared call log: `'flush'` entries come from [OrderRecordingSyncService],
+  /// `'report:<year>-<month>'` from the report repository.
+  var orderLog = <String>[];
+  var reportRepo = MockReportRepository();
+
   /// Stub for the sync service's flush call (all named args).
   void stubCreateExpense(
     Future<Result<Expense, ExpenseFailure>> Function() answer,
@@ -138,6 +160,12 @@ void main() {
         isOnlineProvider.overrideWith(
           (ref) => online ?? Stream<bool>.value(true),
         ),
+        // _invalidateDerived() refreshes the report after the flush; without
+        // this override it would hit the real Supabase-backed repository.
+        reportRepositoryProvider.overrideWithValue(reportRepo),
+        expenseSyncServiceProvider.overrideWithValue(
+          OrderRecordingSyncService(mockRepo, store, orderLog),
+        ),
       ],
     );
   }
@@ -167,6 +195,8 @@ void main() {
   setUp(() {
     mockRepo = MockExpenseRepository();
     store = FakePendingExpenseStore();
+    orderLog = <String>[];
+    reportRepo = MockReportRepository();
 
     // Default: auto-load returns empty.
     when(
@@ -179,6 +209,22 @@ void main() {
 
     // Default: sync flush succeeds with a server expense.
     stubCreateExpense(() async => Success(makeExpense(id: 99)));
+
+    // Default: report refresh succeeds; log the month it asked for.
+    when(
+      () => reportRepo.getMonthlyReport(
+        householdId: 1,
+        year: any(named: 'year'),
+        month: any(named: 'month'),
+        categories: any(named: 'categories'),
+      ),
+    ).thenAnswer((invocation) async {
+      orderLog.add(
+        'report:${invocation.namedArguments[#year]}-'
+        '${invocation.namedArguments[#month]}',
+      );
+      return Success(makeReport());
+    });
 
     SharedPreferences.setMockInitialValues({});
 
@@ -265,6 +311,57 @@ void main() {
         expect(state.value!.single.id, lessThan(0));
 
         await settle();
+      },
+    );
+
+    test(
+      'createExpense flushes the outbox before refreshing the report',
+      () async {
+        // Regression: createExpense must NOT refresh the report before the
+        // flush lands — the refresh runs from retrySync() after flushing.
+        container.read(expenseControllerProvider);
+        await waitForLoad();
+
+        // Real bug-1 scenario: user already opened Reports, so
+        // reportControllerProvider is alive. _invalidateDerived() guards with
+        // ref.exists — without a live report the refresh is (correctly)
+        // skipped and this test has nothing to assert. build() schedules the
+        // initial load; an awaited refresh() settles it deterministically.
+        container.read(reportControllerProvider);
+        await container.read(reportControllerProvider.notifier).refresh();
+        await settle();
+        orderLog.clear();
+
+        final notifier = container.read(expenseControllerProvider.notifier);
+        final result = await notifier.createExpense(
+          amount: 250,
+          date: DateTime.now(),
+          categoryId: 1,
+        );
+        expect(result, isTrue);
+
+        // (c) optimistic home behavior: pending expense visible immediately.
+        final optimistic = container.read(expenseControllerProvider);
+        expect(optimistic.value, hasLength(1));
+        expect(optimistic.value!.single.amount, 250.0);
+        expect(optimistic.value!.single.syncStatus, ExpenseSyncStatus.pending);
+
+        // Let the unawaited retrySync() (flush -> reload -> refresh) finish.
+        await settle();
+
+        // (a) order: flush first, no report fetch before it.
+        expect(orderLog, isNotEmpty);
+        expect(orderLog.first, 'flush');
+        final firstReport = orderLog.indexWhere((e) => e.startsWith('report:'));
+        expect(
+          firstReport,
+          greaterThan(0),
+          reason: 'report must be fetched after flush, got $orderLog',
+        );
+
+        // (b) report queried for the currently selected month (now()).
+        final now = DateTime.now();
+        expect(orderLog, contains('report:${now.year}-${now.month}'));
       },
     );
 
@@ -500,6 +597,41 @@ void main() {
       expect(state.hasError, isTrue);
       expect(state.hasValue, isFalse);
     });
+
+    test(
+      'cold-start retrySync never creates reportControllerProvider',
+      () async {
+        // Regression (TEST-006a): _invalidateDerived() must guard with
+        // ref.exists(reportControllerProvider) — reading `.notifier` would
+        // CREATE the provider on cold start, and its refresh() would race
+        // ReportController.build() leaving the report stuck in AsyncLoading.
+        recreateContainer(online: Stream<bool>.value(false));
+
+        container.read(expenseControllerProvider);
+        await waitForLoad();
+        expect(container.exists(reportControllerProvider), isFalse);
+
+        // Explicit path: full retrySync -> _invalidateDerived().
+        await container.read(expenseControllerProvider.notifier).retrySync();
+        await settle();
+        expect(
+          container.exists(reportControllerProvider),
+          isFalse,
+          reason: 'retrySync must not eagerly create reportControllerProvider',
+        );
+
+        // Listener path: cold start with connectivity up — the isOnline
+        // listener fires its own retrySync; the provider must stay untouched.
+        recreateContainer(online: Stream<bool>.value(true));
+        container.read(expenseControllerProvider);
+        await settle();
+        expect(
+          container.exists(reportControllerProvider),
+          isFalse,
+          reason: 'listener-triggered retrySync must not create the report',
+        );
+      },
+    );
 
     test(
       'reconnect flushes pending and replaces with server expense',

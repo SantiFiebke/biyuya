@@ -244,6 +244,7 @@ void main() {
         householdId: 1,
         year: any(named: 'year'),
         month: any(named: 'month'),
+        categories: any(named: 'categories'),
       ),
     ).thenAnswer((_) async => const Success(seededReport));
 

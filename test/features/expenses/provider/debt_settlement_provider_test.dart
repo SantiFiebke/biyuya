@@ -1,5 +1,7 @@
 import 'package:biyuya/src/core/domain/entities/user_profile.dart';
 import 'package:biyuya/src/features/auth/provider/household_members_provider.dart';
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/debt_settlement.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
@@ -46,6 +48,11 @@ ProviderContainer _container({
     overrides: [
       expenseControllerProvider.overrideWithValue(AsyncData(expenses)),
       householdMembersProvider.overrideWithValue(AsyncData(members)),
+      // debtSettlement watches categoryControllerProvider; keep the real
+      // Supabase-backed chain out of the test.
+      categoryControllerProvider.overrideWithValue(
+        const AsyncData(<Category>[]),
+      ),
     ],
   );
   addTearDown(container.dispose);

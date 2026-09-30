@@ -2,49 +2,45 @@
 
 import 'dart:async';
 
+import 'package:biyuya/src/core/utils/request_guard.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/provider/categories_provider.dart';
 import 'package:biyuya/src/features/categories/provider/category_repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'category_controller.g.dart';
 
 @Riverpod(keepAlive: true)
-class CategoryController extends _$CategoryController {
-  // Invalida respuestas en vuelo: build()/cargas nuevas lo incrementan y una
-  // respuesta de un epoch anterior se descarta (evita data de la cuenta
-  // anterior en `state` tras un rebuild).
-  int _epoch = 0;
-
+class CategoryController extends _$CategoryController with RequestGuard {
   @override
   AsyncValue<List<Category>> build() {
-    _epoch += 1;
+    invalidateRequests();
     unawaited(Future.microtask(_loadCategories));
     return const AsyncData([]);
   }
 
   Future<void> _loadCategories() async {
-    _epoch += 1;
-    final epoch = _epoch;
-    final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
-
-    if (householdId == null || householdId.isEmpty) {
-      state = const AsyncData([]);
-      return;
-    }
-
+    final token = startRequest();
     state = const AsyncLoading();
-    final repository = ref.read(categoryRepositoryProvider);
-    final result = await repository.getCategories(
-      householdId: int.parse(householdId),
-    );
-    if (epoch != _epoch) {
-      return;
-    }
-    result.when((categories) {
+    try {
+      final categories = await ref.read(categoriesProvider.future);
+      if (!ref.mounted) {
+        return;
+      }
+      if (isStale(token)) {
+        return;
+      }
       state = AsyncData(categories);
-    }, (failure) => state = AsyncError(failure, StackTrace.current));
+    } on Object catch (error, stackTrace) {
+      if (!ref.mounted) {
+        return;
+      }
+      if (isStale(token)) {
+        return;
+      }
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<bool> createCategory({
@@ -54,10 +50,11 @@ class CategoryController extends _$CategoryController {
     double? budgetAmount,
     bool isExpense = true,
   }) async {
-    final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
-
-    if (householdId == null || householdId.isEmpty) {
+    final householdId = ref
+        .read(authSessionControllerProvider)
+        .value
+        ?.householdIdValue;
+    if (householdId == null) {
       return false;
     }
 
@@ -70,12 +67,13 @@ class CategoryController extends _$CategoryController {
       color: color,
       icon: icon,
       budgetAmount: budgetAmount,
-      householdId: int.parse(householdId),
+      householdId: householdId,
       isExpense: isExpense,
     );
 
     return result.when(
       (category) {
+        ref.invalidate(categoriesProvider);
         state = AsyncData([...previous, category]);
         return true;
       },
@@ -109,6 +107,7 @@ class CategoryController extends _$CategoryController {
 
     return result.when(
       (updated) {
+        ref.invalidate(categoriesProvider);
         final index = previous.indexWhere((c) => c.id == id);
         if (index != -1) {
           previous[index] = updated;
@@ -161,6 +160,7 @@ class CategoryController extends _$CategoryController {
 
     return result.when(
       (_) {
+        ref.invalidate(categoriesProvider);
         state = AsyncData(previous.where((c) => c.id != id).toList());
         return true;
       },

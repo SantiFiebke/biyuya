@@ -1,25 +1,23 @@
-import 'package:biyuya/src/core/network/network_timeout.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
-import 'package:biyuya/src/features/categories/domain/repositories/category_repository_base.dart';
+import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/domain/expense_totals.dart';
-import 'package:biyuya/src/features/expenses/domain/models/expense_model.dart';
+import 'package:biyuya/src/features/expenses/domain/repositories/expense_repository_base.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:multiple_result/multiple_result.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class ReportRepositoryImpl implements ReportRepositoryBase {
-  const ReportRepositoryImpl(this._client, this._categoryRepository);
+  const ReportRepositoryImpl(this._expenseRepository);
 
-  final supabase.SupabaseClient _client;
-  final CategoryRepositoryBase _categoryRepository;
+  final ExpenseRepositoryBase _expenseRepository;
 
   @override
   Future<Result<MonthlyReport, ReportFailure>> getMonthlyReport({
     required int householdId,
     required int year,
     required int month,
+    required List<Category> categories,
   }) async {
     try {
       final currentExpenses = await _fetchExpensesByMonth(
@@ -36,7 +34,6 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
         month: previousMonth,
       );
 
-      final categories = await _loadCategories(householdId);
       final excludedIds = excludedCategoryIds(categories);
 
       final total = sumCountableExpenses(currentExpenses, excludedIds);
@@ -68,37 +65,27 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
     }
   }
 
-  Future<List<ExpenseModel>> _fetchExpensesByMonth({
+  Future<List<Expense>> _fetchExpensesByMonth({
     required int householdId,
     required int year,
     required int month,
   }) async {
-    final startDate = DateTime(year, month);
-    final endDate = DateTime(year, month + 1, 0, 23, 59, 59);
-
-    final data = await _client
-        .from('expenses')
-        .select()
-        .eq('household_id', householdId)
-        .gte('date', startDate.toIso8601String())
-        .lte('date', endDate.toIso8601String())
-        .timeout(kNetworkTimeout);
-
-    return data.map(ExpenseModel.fromJson).toList();
-  }
-
-  Future<List<Category>> _loadCategories(int householdId) async {
-    final result = await _categoryRepository.getCategories(
+    final result = await _expenseRepository.getExpensesByMonth(
       householdId: householdId,
+      year: year,
+      month: month,
     );
-    // ponytail: local avoids R inferring as Future from the return context.
-    final categories = result.when((cats) => cats, (_) => <Category>[]);
-    return categories;
+    // ponytail: unwrap here so the existing `on Exception` in getMonthlyReport
+    // maps any ExpenseFailure to a ReportFailure.
+    return result.when<List<Expense>>(
+      (expenses) => expenses,
+      (failure) => throw _ExpensesFetchException(failure.message),
+    );
   }
 
   List<CategoryBreakdown> _calculateCategoryBreakdowns({
-    required List<ExpenseModel> expenses,
-    required List<ExpenseModel> previousExpenses,
+    required List<Expense> expenses,
+    required List<Expense> previousExpenses,
     required double total,
     required List<Category> categories,
   }) {
@@ -154,4 +141,13 @@ class ReportRepositoryImpl implements ReportRepositoryBase {
 
     return breakdowns;
   }
+}
+
+class _ExpensesFetchException implements Exception {
+  const _ExpensesFetchException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

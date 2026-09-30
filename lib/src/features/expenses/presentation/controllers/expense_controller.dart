@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:biyuya/src/core/constants/app_constants.dart';
 import 'package:biyuya/src/core/data/widget_daily_total_sync.dart';
 import 'package:biyuya/src/core/network/connectivity_provider.dart';
+import 'package:biyuya/src/core/utils/request_guard.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/presentation/controllers/category_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
+import 'package:biyuya/src/features/expenses/domain/expense_merge.dart';
 import 'package:biyuya/src/features/expenses/domain/expense_totals.dart';
 import 'package:biyuya/src/features/expenses/domain/services/featured_categories_calculator.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_list_controller.dart';
@@ -19,19 +21,15 @@ import 'package:uuid/uuid.dart';
 part 'expense_controller.g.dart';
 
 @Riverpod(keepAlive: true)
-class ExpenseController extends _$ExpenseController {
+class ExpenseController extends _$ExpenseController with RequestGuard {
   bool _isSubmitting = false;
-  // Invalida respuestas en vuelo: build()/cargas nuevas lo incrementan y una
-  // respuesta de un epoch anterior se descarta (evita escribir data de la
-  // cuenta anterior en `state` tras un rebuild).
-  int _epoch = 0;
 
   @override
   AsyncValue<List<Expense>> build() {
     // ponytail: reset submit guard — notifier instance survives invalidate,
     // so a logout mid-submit must not leave _isSubmitting stuck true.
     _isSubmitting = false;
-    _epoch += 1;
+    invalidateRequests();
 
     ref.listen(isOnlineProvider, (previous, next) {
       if (next.value == true) {
@@ -65,29 +63,35 @@ class ExpenseController extends _$ExpenseController {
     required int year,
     required int month,
   }) async {
-    _epoch += 1;
-    final epoch = _epoch;
-    final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
-
-    if (householdId == null || householdId.isEmpty) {
+    final token = startRequest();
+    final householdId = ref
+        .read(authSessionControllerProvider)
+        .value
+        ?.householdIdValue;
+    if (householdId == null) {
       _emitExpenses(const []);
       return;
     }
 
     final pending = await ref.read(pendingExpenseStoreProvider).load();
-    if (epoch != _epoch) {
+    if (!ref.mounted) {
+      return;
+    }
+    if (isStale(token)) {
       return;
     }
 
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.getExpensesByMonth(
-      householdId: int.parse(householdId),
+      householdId: householdId,
       year: year,
       month: month,
     );
-    if (epoch != _epoch) {
+    if (!ref.mounted) {
+      return;
+    }
+    if (isStale(token)) {
       return;
     }
     result.when(
@@ -102,6 +106,9 @@ class ExpenseController extends _$ExpenseController {
 
   /// Single exit point: sets expenses state and syncs widget total.
   void _emitExpenses(List<Expense> expenses) {
+    if (!ref.mounted) {
+      return;
+    }
     state = AsyncData(expenses);
     final now = DateTime.now();
     final categories =
@@ -149,31 +156,34 @@ class ExpenseController extends _$ExpenseController {
     if (pending.isNotEmpty) {
       _emitExpenses(pending);
     } else {
+      if (!ref.mounted) {
+        return;
+      }
       state = AsyncError(failure, StackTrace.current);
     }
   }
 
-  /// Concatenates synced + pending and emits them by date descending.
-  /// Copies first so the inputs are never mutated.
+  /// Merges synced + pending via [mergeExpensesByDateDesc] and emits them.
   void _merge(List<Expense> synced, List<Expense> pending) {
-    final merged = [...synced, ...pending]
-      ..sort((a, b) => b.date.compareTo(a.date));
-    _emitExpenses(merged);
+    _emitExpenses(mergeExpensesByDateDesc(synced, pending));
   }
 
   /// Reloads the outbox, refreshes the current-month network list and
   /// re-merges. Keeps the previous state visible instead of flashing loading.
   Future<void> _reloadMerge() async {
-    _epoch += 1;
-    final epoch = _epoch;
+    final token = startRequest();
     final pending = await ref.read(pendingExpenseStoreProvider).load();
-    if (epoch != _epoch) {
+    if (!ref.mounted) {
       return;
     }
-    final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
-
-    if (householdId == null || householdId.isEmpty) {
+    if (isStale(token)) {
+      return;
+    }
+    final householdId = ref
+        .read(authSessionControllerProvider)
+        .value
+        ?.householdIdValue;
+    if (householdId == null) {
       _emitExpenses(pending);
       return;
     }
@@ -182,11 +192,14 @@ class ExpenseController extends _$ExpenseController {
     final result = await ref
         .read(expenseRepositoryProvider)
         .getExpensesByMonth(
-          householdId: int.parse(householdId),
+          householdId: householdId,
           year: now.year,
           month: now.month,
         );
-    if (epoch != _epoch) {
+    if (!ref.mounted) {
+      return;
+    }
+    if (isStale(token)) {
       return;
     }
     result.when(
@@ -195,18 +208,18 @@ class ExpenseController extends _$ExpenseController {
     );
   }
 
-  Future<void> _flushAndRemerge() async {
-    await ref.read(expenseSyncServiceProvider).flush();
-    await _reloadMerge();
-  }
-
-  /// Single choke point for derived state: reports + the paginated list view.
-  /// Without invalidating [expenseListControllerProvider] the list view keeps
-  /// its stale items after a mutation (its initial-load guard skips refresh).
+  /// Single choke point for derived state: report (refrescado sin perder el
+  /// mes seleccionado, solo si ya está vivo) + la lista paginada.
+  /// Sin invalidar [expenseListControllerProvider] la vista lista mantiene
+  /// items viejos (su guard de carga inicial saltea el refresh).
   void _invalidateDerived() {
-    ref
-      ..invalidate(reportControllerProvider)
-      ..invalidate(expenseListControllerProvider);
+    ref.invalidate(expenseListControllerProvider);
+    // ref.exists: leer `.notifier` crearía el provider. Crear el reporte en el
+    // arranque (retrySync via listener de conectividad) hacía que su refresh()
+    // compitiera con build() y quedara atascado en AsyncLoading.
+    if (ref.exists(reportControllerProvider)) {
+      unawaited(ref.read(reportControllerProvider.notifier).refresh());
+    }
   }
 
   /// Flushes the outbox, refreshes state and reports.
@@ -223,10 +236,10 @@ class ExpenseController extends _$ExpenseController {
     String? description,
   }) async {
     final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
+    final householdId = session.value?.householdIdValue;
     final userUuid = _userUuid;
 
-    if (householdId == null || householdId.isEmpty || userUuid == null) {
+    if (householdId == null || userUuid == null) {
       return false;
     }
 
@@ -237,7 +250,7 @@ class ExpenseController extends _$ExpenseController {
     final pendingExpense = Expense.pending(
       amount: amount,
       date: date,
-      householdId: int.parse(householdId),
+      householdId: householdId,
       categoryId: categoryId,
       clientId: clientId,
       description: description,
@@ -246,16 +259,26 @@ class ExpenseController extends _$ExpenseController {
     );
 
     await ref.read(pendingExpenseStoreProvider).add(pendingExpense);
+    if (!ref.mounted) {
+      return false;
+    }
     _emitExpenses([pendingExpense, ...previous]);
-    _invalidateDerived();
-
-    unawaited(_flushAndRemerge());
+    // El reporte se refresca en retrySync(), DESPUÉS del flush: invalidarlo
+    // acá dispara un refetch que compite con el insert y queda stale.
+    ref.invalidate(expenseListControllerProvider);
+    unawaited(retrySync());
     return true;
   }
 
   Future<bool> discardPending(String clientId) async {
     await ref.read(pendingExpenseStoreProvider).remove(clientId);
+    if (!ref.mounted) {
+      return false;
+    }
     await _reloadMerge();
+    if (!ref.mounted) {
+      return false;
+    }
     _invalidateDerived();
     return true;
   }
@@ -284,6 +307,9 @@ class ExpenseController extends _$ExpenseController {
       description: description,
       categoryId: categoryId,
     );
+    if (!ref.mounted) {
+      return false;
+    }
 
     return await result.when(
       (updated) {
@@ -357,6 +383,9 @@ class ExpenseController extends _$ExpenseController {
     state = const AsyncLoading();
     final repository = ref.read(expenseRepositoryProvider);
     final result = await repository.deleteExpense(id: id);
+    if (!ref.mounted) {
+      return false;
+    }
 
     return await result.when(
       (_) {

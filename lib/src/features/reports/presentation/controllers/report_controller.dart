@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/utils/request_guard.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
+import 'package:biyuya/src/features/categories/provider/categories_provider.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
 import 'package:equatable/equatable.dart';
@@ -23,33 +26,29 @@ class ReportState extends Equatable {
 }
 
 @Riverpod(keepAlive: true)
-class ReportController extends _$ReportController {
-  // Invalida respuestas en vuelo: build()/cargas nuevas lo incrementan y una
-  // respuesta de un epoch anterior se descarta (evita data de la cuenta
-  // anterior en `state` tras un rebuild).
-  int _epoch = 0;
-
+class ReportController extends _$ReportController with RequestGuard {
   @override
   AsyncValue<ReportState> build() {
-    _epoch += 1;
+    invalidateRequests();
     final now = DateTime.now();
     unawaited(Future.microtask(_loadReport));
     return AsyncData(ReportState(year: now.year, month: now.month));
   }
 
   Future<void> _loadReport() async {
-    _epoch += 1;
-    final epoch = _epoch;
     // Capturado antes de AsyncLoading: el loading no conserva value.
     final selected = state.value;
     if (selected == null) {
+      // Sin mes seleccionado (carga en vuelo o estado de error): no-op. NO
+      // invalidamos acá: eso descartaría la respuesta en vuelo y dejaría el
+      // estado atascado en AsyncLoading.
       return;
     }
-
-    final session = ref.read(authSessionControllerProvider);
-    final householdId = session.value?.householdId;
-
-    if (householdId == null || householdId.isEmpty) {
+    final householdId = ref
+        .read(authSessionControllerProvider)
+        .value
+        ?.householdIdValue;
+    if (householdId == null) {
       state = AsyncData(
         ReportState(year: selected.year, month: selected.month),
       );
@@ -57,13 +56,26 @@ class ReportController extends _$ReportController {
     }
 
     state = const AsyncLoading();
-    final repository = ref.read(reportRepositoryProvider);
-    final result = await repository.getMonthlyReport(
-      householdId: int.parse(householdId),
-      year: selected.year,
-      month: selected.month,
-    );
-    if (epoch != _epoch) {
+    final result = await runLatest(() async {
+      List<Category> categories;
+      try {
+        categories = await ref.read(categoriesProvider.future);
+      } on Object catch (_) {
+        categories = const <Category>[];
+      }
+      return await ref
+          .read(reportRepositoryProvider)
+          .getMonthlyReport(
+            householdId: householdId,
+            year: selected.year,
+            month: selected.month,
+            categories: categories,
+          );
+    });
+    if (result == null) {
+      return; // obsoleta: arrancó otra carga
+    }
+    if (!ref.mounted) {
       return;
     }
     result.when(
@@ -73,6 +85,11 @@ class ReportController extends _$ReportController {
       (failure) => state = AsyncError(failure, StackTrace.current),
     );
   }
+
+  /// Recarga el reporte del mes seleccionado sin perder la selección.
+  /// A diferencia de `invalidate`, no re-ejecuta `build()` (que resetearía el
+  /// mes a `DateTime.now()`), así el mes elegido se conserva tras una mutación.
+  Future<void> refresh() => _loadReport();
 
   Future<void> previousMonth() async {
     final current = state.value;

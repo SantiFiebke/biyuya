@@ -14,6 +14,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Límite global de reintentos de Riverpod: 3 (el default es 10). Mantiene el
+/// backoff exponencial y el skip de ProviderException/Error del default.
+Duration? _boundedRetry(int retryCount, Object error) =>
+    ProviderContainer.defaultRetry(retryCount, error, maxRetries: 3);
+
 Future<void> main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
@@ -25,7 +30,7 @@ Future<void> main() async {
     publishableKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
   );
 
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(const ProviderScope(retry: _boundedRetry, child: MyApp()));
 }
 
 class MyApp extends ConsumerStatefulWidget {

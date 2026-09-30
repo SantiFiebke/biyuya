@@ -2,7 +2,7 @@ import 'package:biyuya/src/core/presentation/utils/category_utils.dart';
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/core/presentation/widgets/category_avatar.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
-import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/provider/expenses_by_month_provider.dart';
 import 'package:biyuya/src/features/reports/domain/entities/insight.dart';
 import 'package:biyuya/src/features/reports/domain/insight_expense_diff.dart';
 import 'package:biyuya/theme/theme.dart';
@@ -44,28 +44,36 @@ class InsightComparisonSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allExpenses = ref.watch(expenseControllerProvider).value ?? [];
-    final inCategory = allExpenses
-        .where((e) => e.categoryId == insight.categoryId)
-        .toList();
-
-    final current = inCategory
-        .where((e) => e.date.year == year && e.date.month == month)
-        .toList();
     // Enero vuelve a diciembre del año anterior.
     final previousYear = month == 1 ? year - 1 : year;
     final previousMonth = month == 1 ? 12 : month - 1;
-    final previous = inCategory
-        .where(
-          (e) => e.date.year == previousYear && e.date.month == previousMonth,
-        )
-        .toList();
+
+    final currentCategory =
+        (ref.watch(expensesByMonthProvider(year: year, month: month)).value ??
+                <Expense>[])
+            .where((e) => e.categoryId == insight.categoryId)
+            .toList();
+    final previousCategory =
+        (ref
+                    .watch(
+                      expensesByMonthProvider(
+                        year: previousYear,
+                        month: previousMonth,
+                      ),
+                    )
+                    .value ??
+                <Expense>[])
+            .where((e) => e.categoryId == insight.categoryId)
+            .toList();
 
     return _InsightComparisonContent(
       insight: insight,
-      current: current,
-      previous: previous,
-      tags: classifyInsightExpenses(current: current, previous: previous),
+      current: currentCategory,
+      previous: previousCategory,
+      tags: classifyInsightExpenses(
+        current: currentCategory,
+        previous: previousCategory,
+      ),
     );
   }
 }

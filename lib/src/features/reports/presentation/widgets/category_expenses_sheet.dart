@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
-import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/provider/expenses_by_month_provider.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,7 +41,9 @@ class CategoryExpensesSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final expensesAsync = ref.watch(expenseControllerProvider);
+    final expensesAsync = ref.watch(
+      expensesByMonthProvider(year: year, month: month),
+    );
     final allExpenses = expensesAsync.value ?? [];
     final filtered = allExpenses
         .where((e) => e.categoryId == breakdown.categoryId)

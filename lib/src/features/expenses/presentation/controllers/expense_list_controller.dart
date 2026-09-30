@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:biyuya/src/core/utils/request_guard.dart';
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
@@ -100,15 +101,11 @@ class ExpenseListState extends Equatable {
 /// se vea aunque todavía no esté en el servidor. [loadMore] anexa la página
 /// siguiente hasta que `hasMore` queda en false.
 @Riverpod(keepAlive: true)
-class ExpenseListController extends _$ExpenseListController {
+class ExpenseListController extends _$ExpenseListController with RequestGuard {
   /// Filas por página (server-side).
   static const pageSize = 30;
 
   bool _loading = false;
-  // Invalida respuestas en vuelo: refresh()/setFilters() lo incrementan y una
-  // respuesta de un epoch anterior se descarta (evita anexar páginas viejas a
-  // una lista ya reiniciada).
-  int _epoch = 0;
 
   @override
   ExpenseListState build() {
@@ -131,8 +128,7 @@ class ExpenseListController extends _$ExpenseListController {
   /// página con los filtros actuales. Sin household en la sesión => estado
   /// vacío.
   Future<void> refresh() async {
-    _epoch += 1;
-    final epoch = _epoch;
+    final token = startRequest();
     state = state.copyWith(offset: 0, hasMore: false, isLoadingMore: false);
 
     final householdId = _householdId();
@@ -146,7 +142,10 @@ class ExpenseListController extends _$ExpenseListController {
     state = state.copyWith(clearError: true);
 
     final pending = await ref.read(pendingExpenseStoreProvider).load();
-    if (epoch != _epoch) {
+    if (!ref.mounted) {
+      return;
+    }
+    if (isStale(token)) {
       return;
     }
 
@@ -161,7 +160,10 @@ class ExpenseListController extends _$ExpenseListController {
           endDate: state.endDate,
           userUuid: state.userUuid,
         );
-    if (epoch != _epoch) {
+    if (!ref.mounted) {
+      return;
+    }
+    if (isStale(token)) {
       return;
     }
     _loading = false;
@@ -188,7 +190,7 @@ class ExpenseListController extends _$ExpenseListController {
     if (_loading || !state.hasMore) {
       return;
     }
-    final epoch = _epoch;
+    final token = currentRequest;
     _loading = true;
     state = state.copyWith(isLoadingMore: true);
 
@@ -210,7 +212,10 @@ class ExpenseListController extends _$ExpenseListController {
           endDate: state.endDate,
           userUuid: state.userUuid,
         );
-    if (epoch != _epoch) {
+    if (!ref.mounted) {
+      return;
+    }
+    if (isStale(token)) {
       // refresh()/setFilters() reiniciaron la lista: esta página ya no aplica.
       return;
     }
@@ -268,16 +273,8 @@ class ExpenseListController extends _$ExpenseListController {
   }
 
   /// householdId de la sesión; null si no hay sesión/household (lista vacía).
-  int? _householdId() {
-    final householdId = ref
-        .read(authSessionControllerProvider)
-        .value
-        ?.householdId;
-    if (householdId == null || householdId.isEmpty) {
-      return null;
-    }
-    return int.parse(householdId);
-  }
+  int? _householdId() =>
+      ref.read(authSessionControllerProvider).value?.householdIdValue;
 
   /// Pendientes (outbox) primero + página del servidor, sin duplicar filas que
   /// ya están en el outbox por `clientId`.

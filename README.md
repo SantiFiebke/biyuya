@@ -33,7 +33,15 @@ Aplicación móvil para el seguimiento de los gastos compartidos de un hogar.
 
 ## 📸 Capturas
 
-Capturas pendientes de agregar en `docs/screenshots/`.
+| Registro | Onboarding | Home |
+|:---:|:---:|:---:|
+| <img src="docs/register_screen.jpeg" width="220"> | <img src="docs/onboarding_screen.jpeg" width="220"> | <img src="docs/home_screen.jpeg" width="220"> |
+| Crear cuenta | Configurar hogar | Dashboard del mes |
+
+| Categorías | Reportes | Perfil |
+|:---:|:---:|:---:|
+| <img src="docs/category_screen.jpeg" width="220"> | <img src="docs/report_screen.jpeg" width="220"> | <img src="docs/profile_screen.jpeg" width="220"> |
+| Editar categoría | Reporte mensual | Perfil y ajustes |
 
 ---
 

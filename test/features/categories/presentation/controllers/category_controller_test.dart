@@ -26,6 +26,8 @@ void main() {
     ).thenAnswer((_) async => const Success([]));
 
     container = ProviderContainer(
+      // No container-level `retry` override: categoriesProvider declares its
+      // own `retry: _noRetry`, so a repository failure surfaces promptly.
       overrides: [
         categoryRepositoryProvider.overrideWithValue(mockRepo),
         authSessionControllerProvider.overrideWith(
@@ -40,9 +42,11 @@ void main() {
   });
 
   group('CategoryController', () {
-    test('build returns empty list initially', () {
+    test('build returns empty list initially', () async {
       final state = container.read(categoryControllerProvider);
       expect(state.value, isEmpty);
+      // Drain the unawaited _loadCategories microtask before teardown.
+      await waitForLoad();
     });
 
     test('build auto-loads categories from repository', () async {

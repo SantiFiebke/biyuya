@@ -404,6 +404,9 @@ class ReportSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Skeletonizer(
+      effect: ShimmerEffect(
+        baseColor: Theme.of(context).colorScheme.primary.withAlpha(10),
+      ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -412,7 +415,14 @@ class ReportSkeleton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Icon(Icons.chevron_left),
-                Container(width: 200, height: 28, color: Colors.grey.shade300),
+                Container(
+                  width: 200,
+                  height: 28,
+                  // decoration: BoxDecoration(
+                  //   borderRadius: BorderRadius.circular(8),
+                  // ),
+                  color: Colors.grey,
+                ),
                 const Icon(Icons.chevron_right),
               ],
             ),

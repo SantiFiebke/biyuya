@@ -7,17 +7,17 @@ part 'household_members_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 Future<List<UserProfile>> householdMembers(Ref ref) async {
-  final session = ref.watch(authSessionControllerProvider);
-  final householdId = session.value?.householdId;
+  final householdId = ref
+      .watch(authSessionControllerProvider)
+      .value
+      ?.householdIdValue;
 
-  if (householdId == null || householdId.isEmpty) {
+  if (householdId == null) {
     return [];
   }
 
   final repository = ref.watch(authRepositoryProvider);
-  final result = await repository.getHouseholdMembers(
-    householdId: int.parse(householdId),
-  );
+  final result = await repository.getHouseholdMembers(householdId: householdId);
 
   final members = result.when(
     (members) => members,

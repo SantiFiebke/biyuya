@@ -1,5 +1,6 @@
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/provider/expenses_by_month_provider.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/presentation/views/report_view.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/category_expenses_sheet.dart';
@@ -37,18 +38,60 @@ final _testExpenses = [
   ),
 ];
 
+const _servicioBreakdown = CategoryBreakdown(
+  categoryId: 1,
+  categoryName: 'Servicio',
+  amount: 7500,
+  percentage: 100,
+  categoryColor: '#4CAF50',
+  categoryIcon: '57810',
+);
+
+final _augustExpense = Expense(
+  id: 20,
+  amount: 2500,
+  date: DateTime(2026, 8, 12),
+  householdId: 1,
+  categoryId: 1,
+  description: 'Luz agosto',
+  createdAt: DateTime(2026, 8, 12),
+);
+
+final _septemberExpense = Expense(
+  id: 21,
+  amount: 5000,
+  date: DateTime(2026, 9, 12),
+  householdId: 1,
+  categoryId: 1,
+  description: 'Luz septiembre',
+  createdAt: DateTime(2026, 9, 12),
+);
+
 Widget wrap(Widget child) {
   return ProviderScope(
     child: MaterialApp(home: Scaffold(body: child)),
   );
 }
 
-Widget wrapWithExpenses(Widget child, {List<Expense>? expenses}) {
+/// Harness: overrides the month-scoped source the sheet actually reads
+/// ([expensesByMonthProvider]) for every requested (year, month), plus the
+/// home source ([expenseControllerProvider]) with the whole pool — a
+/// regression back to the home source would leak the other month's rows.
+Widget wrapWithExpenses(
+  Widget child, {
+  List<Expense>? expenses,
+  List<({int year, int month})> months = const [(year: 2026, month: 9)],
+}) {
+  final pool = expenses ?? _testExpenses;
   return ProviderScope(
     overrides: [
-      expenseControllerProvider.overrideWithValue(
-        AsyncData(expenses ?? _testExpenses),
-      ),
+      expenseControllerProvider.overrideWithValue(AsyncData(pool)),
+      for (final m in months)
+        expensesByMonthProvider(year: m.year, month: m.month).overrideWith(
+          (ref) async => pool
+              .where((e) => e.date.year == m.year && e.date.month == m.month)
+              .toList(),
+        ),
     ],
     child: MaterialApp(home: Scaffold(body: child)),
   );
@@ -106,6 +149,34 @@ void main() {
 
       expect(find.text('Almuerzo'), findsOneWidget);
       expect(find.text('Cena'), findsOneWidget);
+    });
+
+    testWidgets('renders only the requested month rows and its header total', (
+      tester,
+    ) async {
+      // Regression: the sheet must read expensesByMonthProvider(2026, 8)
+      // instead of the full home list — the September row (and total) must
+      // not leak into an August sheet.
+      await tester.pumpWidget(
+        wrapWithExpenses(
+          const CategoryExpensesSheet(
+            breakdown: _servicioBreakdown,
+            year: 2026,
+            month: 8,
+          ),
+          expenses: [_augustExpense, _septemberExpense],
+          months: [(year: 2026, month: 8)],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Servicio'), findsOneWidget);
+      expect(find.text('Luz agosto'), findsOneWidget);
+      // Header total + row trailing amount, both '$2.500'.
+      expect(find.textContaining('2.500'), findsNWidgets(2));
+
+      expect(find.text('Luz septiembre'), findsNothing);
+      expect(find.textContaining('5.000'), findsNothing);
     });
   });
 }

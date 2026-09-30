@@ -9,6 +9,7 @@ import 'package:biyuya/src/features/expenses/presentation/controllers/expense_co
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_list_controller.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_repository_provider.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
+import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -94,6 +95,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MockExpenseRepository repo;
+  late MockReportRepository reportRepo;
   late FakePendingExpenseStore store;
   late List<PageCall> calls;
   late List<Expense> serverItems;
@@ -188,9 +190,22 @@ void main() {
     // _emitExpenses writes the native widget total via SharedPreferences.
     SharedPreferences.setMockInitialValues({});
 
+    // _invalidateDerived() refreshes the report (month-preserving) after
+    // createExpense; keep the real Supabase-backed report repository out.
+    reportRepo = MockReportRepository();
+    when(
+      () => reportRepo.getMonthlyReport(
+        householdId: 1,
+        year: any(named: 'year'),
+        month: any(named: 'month'),
+        categories: any(named: 'categories'),
+      ),
+    ).thenAnswer((_) async => Success(makeReport()));
+
     container = ProviderContainer(
       overrides: [
         expenseRepositoryProvider.overrideWithValue(repo),
+        reportRepositoryProvider.overrideWithValue(reportRepo),
         authSessionControllerProvider.overrideWith(
           FakeAuthSessionController.new,
         ),

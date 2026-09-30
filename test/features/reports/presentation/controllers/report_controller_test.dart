@@ -1,8 +1,12 @@
 import 'dart:async';
 
 import 'package:biyuya/src/features/auth/presentation/controllers/auth_session_controller.dart';
+import 'package:biyuya/src/features/categories/domain/entities/category.dart';
 import 'package:biyuya/src/features/categories/domain/repositories/category_repository_base.dart';
+import 'package:biyuya/src/features/categories/provider/category_repository_provider.dart';
+import 'package:biyuya/src/features/expenses/domain/repositories/expense_repository_base.dart';
 import 'package:biyuya/src/features/reports/data/repositories/report_repository_impl.dart';
+import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
@@ -10,85 +14,58 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:multiple_result/multiple_result.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../../../../helpers/test_helpers.dart';
 
 class MockReportRepository extends Mock implements ReportRepositoryImpl {}
 
-class MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
+class MockExpenseRepository extends Mock implements ExpenseRepositoryBase {}
 
 class MockCategoryRepository extends Mock implements CategoryRepositoryBase {}
-
-/// Minimal fake of the PostgREST chain used by [ReportRepositoryImpl].
-/// ponytail: only `select`/`eq`/`gte`/`lte` are exercised; everything else
-/// returns itself so the chain type-checks.
-class _FakeQueryBuilder implements supabase.SupabaseQueryBuilder {
-  _FakeQueryBuilder(this.rows);
-
-  final List<Map<String, dynamic>> rows;
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => _FakeFilterBuilder(rows);
-}
-
-class _FakeFilterBuilder
-    implements supabase.PostgrestFilterBuilder<supabase.PostgrestList> {
-  _FakeFilterBuilder(this.rows);
-
-  final List<Map<String, dynamic>> rows;
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => this;
-
-  @override
-  Future<R> then<R>(
-    FutureOr<R> Function(supabase.PostgrestList) onValue, {
-    Function? onError,
-  }) => Future<supabase.PostgrestList>.value(
-    rows,
-  ).then(onValue, onError: onError);
-}
-
-Map<String, dynamic> _expenseRow({
-  int id = 1,
-  double amount = 100,
-  int categoryId = 1,
-}) => {
-  'id': id,
-  'amount': amount,
-  'date': '2025-07-15T00:00:00.000',
-  'household_id': 1,
-  'category_id': categoryId,
-  'created_at': '2025-07-15T00:00:00.000',
-};
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MockReportRepository mockRepo;
+  late MockCategoryRepository categoryRepo;
   late ProviderContainer container;
   late int currentMonth;
   late int currentYear;
 
+  /// Every `getMonthlyReport` call as `'year-month'`, in order — used to
+  /// assert WHICH month the controller fetched.
+  late List<String> reportCalls;
+
   setUp(() {
     mockRepo = MockReportRepository();
+    categoryRepo = MockCategoryRepository();
+    when(
+      () => categoryRepo.getCategories(householdId: any(named: 'householdId')),
+    ).thenAnswer((_) async => const Success(<Category>[]));
     currentMonth = DateTime.now().month;
     currentYear = DateTime.now().year;
+    reportCalls = <String>[];
 
     when(
       () => mockRepo.getMonthlyReport(
         householdId: 1,
         year: any(named: 'year'),
         month: any(named: 'month'),
+        categories: any(named: 'categories'),
       ),
-    ).thenAnswer(
-      (_) async => Success(makeReport(year: currentYear, month: currentMonth)),
-    );
+    ).thenAnswer((invocation) async {
+      reportCalls.add(
+        '${invocation.namedArguments[#year]}-${invocation.namedArguments[#month]}',
+      );
+      return Success(makeReport(year: currentYear, month: currentMonth));
+    });
 
     container = ProviderContainer(
       overrides: [
         reportRepositoryProvider.overrideWithValue(mockRepo),
+        // ReportController now resolves categories via categoriesProvider,
+        // which reads categoryRepositoryProvider. Keep Supabase out.
+        categoryRepositoryProvider.overrideWithValue(categoryRepo),
         authSessionControllerProvider.overrideWith(
           FakeAuthSessionController.new,
         ),
@@ -101,11 +78,13 @@ void main() {
   });
 
   group('ReportController', () {
-    test('build returns null data initially', () {
+    test('build returns null data initially', () async {
       final state = container.read(reportControllerProvider);
       // Build seeds a ReportState for the current month; report data loads
       // asynchronously and is still null at this point.
       expect(state.value!.report, isNull);
+      // Drain the unawaited _loadReport microtask before teardown.
+      await waitForLoad();
     });
 
     test('build auto-loads report via microtask', () async {
@@ -123,6 +102,7 @@ void main() {
           householdId: 1,
           year: any(named: 'year'),
           month: any(named: 'month'),
+          categories: any(named: 'categories'),
         ),
       ).thenAnswer((_) async => const Error(ReportFailure('db error')));
 
@@ -150,6 +130,7 @@ void main() {
           householdId: 1,
           year: expectedYear,
           month: expectedMonth,
+          categories: any(named: 'categories'),
         ),
       ).thenAnswer(
         (_) async =>
@@ -188,6 +169,7 @@ void main() {
           householdId: 1,
           year: currentYear - 1,
           month: 12,
+          categories: any(named: 'categories'),
         ),
       ).thenAnswer(
         (_) async => Success(makeReport(month: 12, year: currentYear - 1)),
@@ -216,6 +198,7 @@ void main() {
           householdId: 1,
           year: targetYear,
           month: targetMonth,
+          categories: any(named: 'categories'),
         ),
       ).thenAnswer(
         (_) async => Success(makeReport(month: targetMonth, year: targetYear)),
@@ -235,6 +218,7 @@ void main() {
           householdId: 1,
           year: currentYear,
           month: currentMonth,
+          categories: any(named: 'categories'),
         ),
       ).thenAnswer(
         (_) async =>
@@ -285,26 +269,118 @@ void main() {
 
       expect(notifier.canGoNext, isTrue);
     });
+
+    test(
+      'refresh reloads the selected month without resetting to now()',
+      () async {
+        // Regression: refresh() must re-fetch the month currently selected in
+        // state instead of rebuilding with DateTime.now().
+        container.read(reportControllerProvider);
+        await waitForLoad();
+
+        ReportState stateOf() =>
+            container.read(reportControllerProvider).value!;
+
+        final notifier = container.read(reportControllerProvider.notifier);
+        // Walk back from the build-seeded current month to August 2026.
+        var guard = 0;
+        while (!(stateOf().year == 2026 && stateOf().month == 8)) {
+          await notifier.previousMonth();
+          expect(++guard, lessThan(24), reason: 'never reached Aug 2026');
+        }
+        expect(stateOf().month, 8);
+
+        reportCalls.clear();
+        await notifier.refresh();
+
+        // Repo hit for the selected month (2026-08), not for now().
+        expect(reportCalls, contains('2026-8'));
+        final state = stateOf();
+        expect(state.year, 2026);
+        expect(state.month, 8);
+        expect(state.report, isNotNull);
+      },
+    );
+
+    test('refresh during in-flight load does not cancel the fetch', () async {
+      // Regression (TEST-006b): a concurrent/duplicate load must NOT
+      // increment _epoch while state has no value — that discarded the
+      // in-flight response and left state stuck in AsyncLoading forever.
+      final completer = Completer<Result<MonthlyReport, ReportFailure>>();
+      when(
+        () => mockRepo.getMonthlyReport(
+          householdId: 1,
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+          categories: any(named: 'categories'),
+        ),
+      ).thenAnswer((invocation) {
+        reportCalls.add(
+          '${invocation.namedArguments[#year]}-'
+          '${invocation.namedArguments[#month]}',
+        );
+        return completer.future;
+      });
+
+      container.read(reportControllerProvider);
+      await waitForLoad();
+
+      // First load reached AsyncLoading: no value retained.
+      final loading = container.read(reportControllerProvider);
+      expect(loading.isLoading, isTrue);
+      expect(loading.value, isNull);
+      expect(reportCalls, hasLength(1));
+
+      // Duplicate load while the fetch is pending: no-op, no epoch bump,
+      // no second repository call.
+      await container.read(reportControllerProvider.notifier).refresh();
+      expect(
+        reportCalls,
+        hasLength(1),
+        reason: 'refresh with no selected value must not start a fetch',
+      );
+
+      completer.complete(
+        Success(makeReport(year: currentYear, month: currentMonth)),
+      );
+      await waitForLoad();
+
+      // The pending fetch still applies: AsyncData, not stuck AsyncLoading.
+      final state = container.read(reportControllerProvider);
+      expect(state, isA<AsyncData<ReportState>>());
+      expect(state.isLoading, isFalse);
+      expect(state.value!.report, isNotNull);
+      expect(state.value!.report!.total, 1000);
+      expect(state.value!.year, currentYear);
+      expect(state.value!.month, currentMonth);
+    });
   });
 
   group('ReportController budgetAmount propagation', () {
-    late MockSupabaseClient mockClient;
+    late MockExpenseRepository mockExpenseRepo;
     late MockCategoryRepository mockCategoryRepo;
     late ProviderContainer budgetContainer;
 
     setUp(() {
-      mockClient = MockSupabaseClient();
+      mockExpenseRepo = MockExpenseRepository();
       mockCategoryRepo = MockCategoryRepository();
 
       when(
-        () => mockClient.from(any()),
-      ).thenAnswer((_) => _FakeQueryBuilder([_expenseRow()]));
+        () => mockExpenseRepo.getExpensesByMonth(
+          householdId: any(named: 'householdId'),
+          year: any(named: 'year'),
+          month: any(named: 'month'),
+        ),
+      ).thenAnswer((_) async => Success([makeExpense()]));
 
       budgetContainer = ProviderContainer(
         overrides: [
           reportRepositoryProvider.overrideWith(
-            (ref) => ReportRepositoryImpl(mockClient, mockCategoryRepo),
+            (ref) => ReportRepositoryImpl(mockExpenseRepo),
           ),
+          // categoriesProvider resolves categories through the category
+          // repository; this is what feeds the real ReportRepositoryImpl.
+          categoryRepositoryProvider.overrideWithValue(mockCategoryRepo),
           authSessionControllerProvider.overrideWith(
             FakeAuthSessionController.new,
           ),

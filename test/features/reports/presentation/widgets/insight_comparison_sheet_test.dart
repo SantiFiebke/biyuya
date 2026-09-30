@@ -1,6 +1,7 @@
 import 'package:biyuya/src/core/presentation/widgets/amount_text.dart';
 import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_controller.dart';
+import 'package:biyuya/src/features/expenses/provider/expenses_by_month_provider.dart';
 import 'package:biyuya/src/features/reports/domain/entities/insight.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/insight_comparison_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,17 @@ const _testInsight = Insight(
   changePct: 200,
   isIncrease: true,
   categoryColor: '#FF5722',
+  categoryIcon: '57810',
+);
+
+const _servicioInsight = Insight(
+  categoryId: 1,
+  categoryName: 'Servicio',
+  currentAmount: 5000,
+  previousAmount: 2500,
+  changePct: 100,
+  isIncrease: true,
+  categoryColor: '#4CAF50',
   categoryIcon: '57810',
 );
 
@@ -79,12 +91,38 @@ final List<Expense> _testExpenses = [
   ),
 ];
 
-Widget wrapWithExpenses(Widget child, {List<Expense>? expenses}) {
+/// Harness: each requested (year, month) is served by its own
+/// [expensesByMonthProvider] override. [expenseControllerProvider] carries
+/// only the CURRENT month, like the home screen really does — a regression
+/// back to it leaves 'Mes anterior' empty and fails the month-scoping tests.
+///
+/// [monthLog] records which (year, month) pairs the sheet actually fetched.
+Widget wrapWithExpenses(
+  Widget child, {
+  List<Expense>? expenses,
+  List<({int year, int month})> months = const [
+    (year: 2026, month: 9),
+    (year: 2026, month: 8),
+  ],
+  List<({int year, int month})> currentMonth = const [(year: 2026, month: 9)],
+  List<String>? monthLog,
+}) {
+  final pool = expenses ?? _testExpenses;
+  List<Expense> forMonth(int year, int month) =>
+      pool.where((e) => e.date.year == year && e.date.month == month).toList();
+
   return ProviderScope(
     overrides: [
       expenseControllerProvider.overrideWithValue(
-        AsyncData(expenses ?? _testExpenses),
+        AsyncData([for (final m in currentMonth) ...forMonth(m.year, m.month)]),
       ),
+      for (final m in months)
+        expensesByMonthProvider(year: m.year, month: m.month).overrideWith((
+          ref,
+        ) async {
+          monthLog?.add('${m.year}-${m.month}');
+          return forMonth(m.year, m.month);
+        }),
     ],
     child: MaterialApp(home: Scaffold(body: child)),
   );
@@ -255,6 +293,85 @@ void main() {
 
       expect(find.text('Comida'), findsOneWidget);
       expect(find.text('Mes anterior'), findsOneWidget);
+    });
+
+    testWidgets(
+      'Servicio sep/2026: sections come from each month, not from home',
+      (tester) async {
+        // Regression: 'Mes anterior' must be filled from the Aug override
+        // (2500), not left empty by reading the current-month home list.
+        await tester.pumpWidget(
+          wrapWithExpenses(
+            const InsightComparisonSheet(
+              insight: _servicioInsight,
+              year: 2026,
+              month: 9,
+            ),
+            expenses: [
+              _expense(
+                id: 30,
+                amount: 5000,
+                description: 'Luz',
+                date: DateTime(2026, 9, 10),
+              ),
+              _expense(
+                id: 31,
+                amount: 2500,
+                description: 'Luz',
+                date: DateTime(2026, 8, 10),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Servicio'), findsOneWidget);
+        expect(find.text('Este mes'), findsOneWidget);
+        expect(amountsNear(tester, find.text('Este mes')), [5000]);
+        expect(find.text('Mes anterior'), findsOneWidget);
+        expect(amountsNear(tester, find.text('Mes anterior')), [2500]);
+        expect(find.text('Sin gastos este mes'), findsNothing);
+        expect(find.text('Sin gastos el mes anterior'), findsNothing);
+      },
+    );
+
+    testWidgets('January fetches December of the previous year', (
+      tester,
+    ) async {
+      final monthLog = <String>[];
+      await tester.pumpWidget(
+        wrapWithExpenses(
+          const InsightComparisonSheet(
+            insight: _servicioInsight,
+            year: 2027,
+            month: 1,
+          ),
+          expenses: [
+            _expense(
+              id: 32,
+              amount: 300,
+              description: 'Luz',
+              date: DateTime(2027, 1, 8),
+            ),
+            _expense(
+              id: 33,
+              amount: 700,
+              description: 'Luz',
+              date: DateTime(2026, 12, 8),
+            ),
+          ],
+          months: const [(year: 2027, month: 1), (year: 2026, month: 12)],
+          currentMonth: const [(year: 2027, month: 1)],
+          monthLog: monthLog,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(amountsNear(tester, find.text('Este mes')), [300]);
+      expect(amountsNear(tester, find.text('Mes anterior')), [700]);
+      // The sheet asked for dec/2026 — the January rollover target.
+      expect(monthLog, contains('2027-1'));
+      expect(monthLog, contains('2026-12'));
     });
   });
 }
