@@ -7,18 +7,46 @@ import 'package:biyuya/src/features/expenses/domain/entities/expense.dart';
 import 'package:biyuya/src/features/reports/data/repositories/report_repository_impl.dart';
 import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
+import 'package:biyuya/src/features/reports/domain/entities/savings_report.dart';
+import 'package:biyuya/src/features/reports/domain/entities/weekly_report.dart';
+import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
 import 'package:flutter_localizations/flutter_localizations.dart'
     hide GlobalMaterialLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:multiple_result/multiple_result.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart' show Override;
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-class MockReportRepository extends Mock implements ReportRepositoryImpl {}
+class MockReportRepository extends Mock implements ReportRepositoryImpl {
+  /// Stubs the secondary report endpoints with a [ReportFailure] by default.
+  ///
+  /// `ReportView` mounts `WeeklyReportSection`/`SavingsReportSection`, whose
+  /// controllers call these repositories. Returning an error makes those
+  /// sections shrink, so view tests only assert on the monthly report. Tests
+  /// needing real data re-stub the method (last stub wins in mocktail).
+  MockReportRepository() {
+    when(
+      () => getWeeklyReport(
+        householdId: any(named: 'householdId'),
+        weekStart: any(named: 'weekStart'),
+        categories: any(named: 'categories'),
+      ),
+    ).thenAnswer((_) async => const Error(ReportFailure('unavailable')));
+
+    when(
+      () => getSavingsReport(
+        householdId: any(named: 'householdId'),
+        year: any(named: 'year'),
+        month: any(named: 'month'),
+      ),
+    ).thenAnswer((_) async => const Error(ReportFailure('unavailable')));
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Fake AuthSessionController
@@ -32,6 +60,18 @@ class FakeAuthSessionController extends AuthSessionController {
       name: 'Test',
       lastName: 'User',
       householdId: '1',
+    );
+  }
+}
+
+/// Session without household → report controllers keep AsyncData(null).
+class FakeNoHouseholdAuthSession extends AuthSessionController {
+  @override
+  FutureOr<UserProfile?> build() {
+    return const UserProfile(
+      id: 'test-user-id',
+      name: 'Test',
+      lastName: 'User',
     );
   }
 }
@@ -55,6 +95,7 @@ Category makeCategory({
   String name = 'Test',
   int householdId = 1,
   double? budgetAmount,
+  bool isExpense = true,
 }) {
   return Category(
     id: id,
@@ -62,6 +103,7 @@ Category makeCategory({
     householdId: householdId,
     createdAt: DateTime(2025),
     budgetAmount: budgetAmount,
+    isExpense: isExpense,
   );
 }
 
@@ -101,6 +143,45 @@ MonthlyReport makeReport({
     categoryBreakdowns: categoryBreakdowns,
     year: year,
     month: month,
+  );
+}
+
+WeeklyReport makeWeeklyReport({
+  DateTime? weekStart,
+  DateTime? weekEnd,
+  double total = 1000,
+  double previousWeekTotal = 800,
+  double variation = 25,
+  int year = 2026,
+  int week = 36,
+}) {
+  final start = weekStart ?? DateTime(2026, 9, 7);
+  return WeeklyReport(
+    weekStart: start,
+    weekEnd: weekEnd ?? start.add(const Duration(days: 7)),
+    total: total,
+    previousWeekTotal: previousWeekTotal,
+    variation: variation,
+    breakdowns: const [],
+    year: year,
+    week: week,
+  );
+}
+
+SavingsReport makeSavingsReport({
+  int year = 2026,
+  int month = 9,
+  double totalSaved = 100,
+  double goalAmount = 600,
+  double progressPct = 16.67,
+}) {
+  return SavingsReport(
+    year: year,
+    month: month,
+    totalSaved: totalSaved,
+    goalAmount: goalAmount,
+    progressPct: progressPct,
+    entries: const [],
   );
 }
 

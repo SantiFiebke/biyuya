@@ -14,6 +14,8 @@ import 'package:biyuya/src/features/expenses/presentation/controllers/expense_co
 import 'package:biyuya/src/features/expenses/presentation/controllers/expense_list_controller.dart';
 import 'package:biyuya/src/features/expenses/provider/expense_sync_providers.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
+import 'package:biyuya/src/features/reports/presentation/controllers/savings_report_controller.dart';
+import 'package:biyuya/src/features/reports/presentation/controllers/weekly_report_controller.dart';
 import 'package:biyuya/src/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:biyuya/src/navigation/provider/router_provider.dart';
 import 'package:logger/logger.dart';
@@ -168,6 +170,8 @@ class AuthSessionController extends _$AuthSessionController {
       ..invalidate(expenseControllerProvider)
       ..invalidate(expenseListControllerProvider)
       ..invalidate(reportControllerProvider)
+      ..invalidate(weeklyReportControllerProvider)
+      ..invalidate(savingsReportControllerProvider)
       ..invalidate(householdNameProvider)
       ..invalidate(householdMembersProvider)
       ..invalidate(settingsControllerProvider);

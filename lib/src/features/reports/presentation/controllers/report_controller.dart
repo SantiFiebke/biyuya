@@ -36,7 +36,7 @@ class ReportController extends _$ReportController with RequestGuard {
   }
 
   Future<void> _loadReport() async {
-    // Capturado antes de AsyncLoading: el loading no conserva value.
+    // Capturado antes del AsyncLoading: fija qué mes dispara esta carga.
     final selected = state.value;
     if (selected == null) {
       // Sin mes seleccionado (carga en vuelo o estado de error): no-op. NO
@@ -55,7 +55,9 @@ class ReportController extends _$ReportController with RequestGuard {
       return;
     }
 
-    state = const AsyncLoading();
+    // Retiene el reporte anterior durante la recarga (sin salto de layout).
+    // ignore: invalid_use_of_internal_member
+    state = const AsyncLoading<ReportState>().copyWithPrevious(state);
     final result = await runLatest(() async {
       List<Category> categories;
       try {

@@ -11,7 +11,9 @@ import 'package:biyuya/src/features/reports/domain/entities/category_breakdown.d
 import 'package:biyuya/src/features/reports/domain/entities/insight.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/domain/repositories/report_repository_base.dart';
+import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
 import 'package:biyuya/src/features/reports/presentation/views/report_view.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/budget_progress_section.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/insights_section.dart';
 import 'package:biyuya/src/features/reports/provider/report_repository_provider.dart';
 import 'package:biyuya/theme/theme.dart';
@@ -29,6 +31,14 @@ class _NoHouseholdAuthSession extends AuthSessionController {
   @override
   FutureOr<UserProfile?> build() =>
       const UserProfile(id: 'test-user-id', name: 'Test', lastName: 'User');
+}
+
+/// Stuck in AsyncLoading with no previous value → exercises the skeleton
+/// branch (the real controller always seeds AsyncData, so `when` skips
+/// loading on refresh).
+class _StuckReportController extends ReportController {
+  @override
+  AsyncValue<ReportState> build() => const AsyncLoading<ReportState>();
 }
 
 const _testReport = MonthlyReport(
@@ -171,47 +181,19 @@ void main() {
     });
 
     testWidgets('shows ReportSkeleton when loading', (tester) async {
-      final completer = Completer<Success<MonthlyReport, ReportFailure>>();
-      final stuckRepo = MockReportRepository();
-      when(
-        () => stuckRepo.getMonthlyReport(
-          householdId: any(named: 'householdId'),
-          year: any(named: 'year'),
-          month: any(named: 'month'),
-          categories: any(named: 'categories'),
-        ),
-      ).thenAnswer((_) => completer.future);
-
       await tester.pumpWidget(
         wrapTest(
           child: const ReportView(),
           overrides: [
-            reportRepositoryProvider.overrideWithValue(stuckRepo),
-            authSessionControllerProvider.overrideWith(
-              FakeAuthSessionController.new,
-            ),
-            categoriesProvider.overrideWith((ref) async => const <Category>[]),
+            ...defaultOverrides(),
+            // Stuck in AsyncLoading with no previous value → skeleton branch.
+            reportControllerProvider.overrideWith(_StuckReportController.new),
           ],
         ),
       );
       await tester.pump();
 
       expect(find.byType(ReportSkeleton), findsOneWidget);
-
-      // Complete the future to avoid pending timer on teardown
-      completer.complete(
-        const Success(
-          MonthlyReport(
-            total: 0,
-            previousTotal: 0,
-            variation: 0,
-            categoryBreakdowns: [],
-            year: 2025,
-            month: 7,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
     });
 
     testWidgets('shows error text on failure', (tester) async {
@@ -269,7 +251,21 @@ void main() {
 
       await pumpReport(tester);
 
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      // Budget bar lives in BudgetProgressSection, not in the tile.
+      expect(
+        find.descendant(
+          of: find.byType(BudgetProgressSection),
+          matching: find.byType(LinearProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(CategoryBreakdownTile),
+          matching: find.byType(LinearProgressIndicator),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('hides progress bar when breakdown has no budget', (
@@ -290,7 +286,10 @@ void main() {
       await pumpReport(tester);
 
       final bar = tester.widget<LinearProgressIndicator>(
-        find.byType(LinearProgressIndicator),
+        find.descendant(
+          of: find.byType(BudgetProgressSection),
+          matching: find.byType(LinearProgressIndicator),
+        ),
       );
       expect(bar.color, theme.extension<AppColors>()!.expense);
     });
@@ -305,7 +304,10 @@ void main() {
       await pumpReport(tester);
 
       final bar = tester.widget<LinearProgressIndicator>(
-        find.byType(LinearProgressIndicator),
+        find.descendant(
+          of: find.byType(BudgetProgressSection),
+          matching: find.byType(LinearProgressIndicator),
+        ),
       );
       expect(bar.color, theme.extension<AppColors>()!.income);
     });

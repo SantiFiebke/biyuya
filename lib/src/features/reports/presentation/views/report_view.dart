@@ -11,9 +11,14 @@ import 'package:biyuya/src/features/reports/domain/entities/insight.dart';
 import 'package:biyuya/src/features/reports/domain/entities/monthly_report.dart';
 import 'package:biyuya/src/features/reports/domain/insights.dart';
 import 'package:biyuya/src/features/reports/presentation/controllers/report_controller.dart';
+import 'package:biyuya/src/features/reports/presentation/controllers/savings_report_controller.dart';
+import 'package:biyuya/src/features/reports/presentation/controllers/weekly_report_controller.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/budget_progress_section.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/category_expenses_sheet.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/insight_comparison_sheet.dart';
 import 'package:biyuya/src/features/reports/presentation/widgets/insights_section.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/savings_section.dart';
+import 'package:biyuya/src/features/reports/presentation/widgets/weekly_tracking_section.dart';
 import 'package:biyuya/src/navigation/routes/app_routes.dart';
 import 'package:biyuya/theme/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,11 +48,21 @@ class ReportView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncReport = ref.watch(reportControllerProvider);
 
-    ref.listen<AsyncValue<ReportState>>(reportControllerProvider, (_, state) {
-      state.whenOrNull(
-        error: (error, _) => context.showErrorSnackBar(error.toString()),
-      );
-    });
+    void showError(Object error) => context.showErrorSnackBar(error.toString());
+
+    // Cascade: lint `cascade_invocations` pide un solo receptor `ref`.
+    // Secciones secundarias se ocultan en error (shrink); el feedback va por
+    // snackbar, igual que el reporte mensual.
+    ref
+      ..listen<AsyncValue<ReportState>>(reportControllerProvider, (_, state) {
+        state.whenOrNull(error: (error, _) => showError(error));
+      })
+      ..listen(weeklyReportControllerProvider, (_, state) {
+        state.whenOrNull(error: (error, _) => showError(error));
+      })
+      ..listen(savingsReportControllerProvider, (_, state) {
+        state.whenOrNull(error: (error, _) => showError(error));
+      });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Reportes')),
@@ -167,8 +182,72 @@ class ReportContent extends StatelessWidget {
             const SizedBox(height: 24),
             InsightsSection(insights: insights, onInsightTap: onInsightTap),
           ],
+          // Presupuestos traen su propio espacio superior (shrink sin hueco).
+          BudgetProgressSection(breakdowns: report.categoryBreakdowns),
+          const SizedBox(height: 24),
+          const WeeklyReportSection(),
+          const SizedBox(height: 24),
+          const SavingsReportSection(),
         ],
       ),
+    );
+  }
+}
+
+/// Sección semanal ligada a su controller: maneja su propio `AsyncValue`
+/// (loading/error → shrink, el error además snackbar en `ReportView`) para no
+/// tocar el skeleton/error del reporte mensual.
+class WeeklyReportSection extends ConsumerWidget {
+  const WeeklyReportSection({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncWeekly = ref.watch(weeklyReportControllerProvider);
+    final controller = ref.read(weeklyReportControllerProvider.notifier);
+
+    return asyncWeekly.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (state) {
+        final report = state.report;
+        if (report == null) {
+          return const SizedBox.shrink();
+        }
+        return WeeklyTrackingSection(
+          report: report,
+          onPreviousWeek: controller.previousWeek,
+          onNextWeek: controller.canGoNext ? controller.nextWeek : null,
+        );
+      },
+      // Mantiene el reporte anterior visible durante reload/refresh.
+      skipLoadingOnReload: true,
+      skipLoadingOnRefresh: true,
+    );
+  }
+}
+
+/// Sección de ahorro ligada a su controller. Mismo manejo de `AsyncValue`
+/// que [WeeklyReportSection].
+class SavingsReportSection extends ConsumerWidget {
+  const SavingsReportSection({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncSavings = ref.watch(savingsReportControllerProvider);
+
+    return asyncSavings.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (state) {
+        final report = state.report;
+        if (report == null) {
+          return const SizedBox.shrink();
+        }
+        return SavingsSection(report: report);
+      },
+      // Mantiene el reporte anterior visible durante reload/refresh.
+      skipLoadingOnReload: true,
+      skipLoadingOnRefresh: true,
     );
   }
 }
@@ -283,17 +362,6 @@ class CategoryBreakdownTile extends StatelessWidget {
         Theme.of(context).colorScheme.primary;
     final icon = iconFromCodePoint(breakdown.categoryIcon);
 
-    final budget = breakdown.budgetAmount;
-    final hasBudget = budget != null && budget > 0;
-    final limit = budget ?? 0.0;
-    final appColors = Theme.of(context).extension<AppColors>();
-    final ratio = hasBudget ? breakdown.amount / limit : 0.0;
-    final barColor = ratio > 1.0
-        ? (appColors?.expense ?? Theme.of(context).colorScheme.error)
-        : ratio >= 0.75
-        ? Colors.amber.shade600
-        : (appColors?.income ?? Theme.of(context).colorScheme.primary);
-
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Column(
@@ -340,58 +408,6 @@ class CategoryBreakdownTile extends StatelessWidget {
                   : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          if (hasBudget && breakdown.isExpense)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: ratio.clamp(0.0, 1.0),
-                      color: barColor,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      minHeight: 6,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Gastado',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          AmountText(
-                            amount: breakdown.amount,
-                            style: Theme.of(context).textTheme.bodySmall,
-                            color: barColor,
-                          ),
-                          Text(
-                            ' / ',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          AmountText(
-                            amount: limit,
-                            style: Theme.of(context).textTheme.bodySmall,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );

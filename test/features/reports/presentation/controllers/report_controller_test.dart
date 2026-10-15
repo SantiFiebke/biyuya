@@ -302,10 +302,11 @@ void main() {
       },
     );
 
-    test('refresh during in-flight load does not cancel the fetch', () async {
-      // Regression (TEST-006b): a concurrent/duplicate load must NOT
-      // increment _epoch while state has no value — that discarded the
-      // in-flight response and left state stuck in AsyncLoading forever.
+    test('refresh during in-flight load retains value and still applies', () async {
+      // Regression (TEST-006b): a concurrent/duplicate load must NOT leave
+      // state stuck in AsyncLoading. copyWithPrevious retains the previous
+      // value during the reload, so refresh() is no longer a no-op — it starts
+      // a new fetch and the pending response still applies.
       final completer = Completer<Result<MonthlyReport, ReportFailure>>();
       when(
         () => mockRepo.getMonthlyReport(
@@ -325,20 +326,18 @@ void main() {
       container.read(reportControllerProvider);
       await waitForLoad();
 
-      // First load reached AsyncLoading: no value retained.
+      // First load reached AsyncLoading but retained the seeded value.
       final loading = container.read(reportControllerProvider);
       expect(loading.isLoading, isTrue);
-      expect(loading.value, isNull);
+      expect(loading.value, isNotNull);
+      expect(loading.value!.report, isNull);
       expect(reportCalls, hasLength(1));
 
-      // Duplicate load while the fetch is pending: no-op, no epoch bump,
-      // no second repository call.
-      await container.read(reportControllerProvider.notifier).refresh();
-      expect(
-        reportCalls,
-        hasLength(1),
-        reason: 'refresh with no selected value must not start a fetch',
-      );
+      // Duplicate load while the fetch is pending: value retained → not a
+      // no-op, a second repository call starts.
+      unawaited(container.read(reportControllerProvider.notifier).refresh());
+      await waitForLoad();
+      expect(reportCalls, hasLength(2));
 
       completer.complete(
         Success(makeReport(year: currentYear, month: currentMonth)),
